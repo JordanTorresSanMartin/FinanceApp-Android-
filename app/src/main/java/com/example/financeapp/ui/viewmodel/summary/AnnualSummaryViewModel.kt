@@ -9,14 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Calendar
 import javax.inject.Inject
 
 data class AnnualSummaryUiState(
     val summaries: List<MonthlySummary> = emptyList(),
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val currentYear: Int,
-    val error: String? = null
+    val error: String? = null,
 )
 
 @HiltViewModel
@@ -30,10 +30,10 @@ class AnnualSummaryViewModel @Inject constructor(
     val uiState: StateFlow<AnnualSummaryUiState> = _uiState.asStateFlow()
 
     init {
-        loadSummary()
+        load()
     }
 
-    fun loadSummary() {
+    fun load() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
@@ -47,11 +47,11 @@ class AnnualSummaryViewModel @Inject constructor(
 
     fun nextYear() {
         _uiState.value = _uiState.value.copy(currentYear = _uiState.value.currentYear + 1)
-        loadSummary()
+        load()
     }
 
     fun previousYear() {
         _uiState.value = _uiState.value.copy(currentYear = _uiState.value.currentYear - 1)
-        loadSummary()
+        load()
     }
 }

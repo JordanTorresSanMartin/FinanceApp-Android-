@@ -8,9 +8,11 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.functions.Functions
 import io.ktor.client.engine.okhttp.OkHttp
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.functions.functions
 import javax.inject.Singleton
 
 @Module
@@ -30,6 +32,7 @@ object AppModule {
             httpEngine = OkHttp.create()
             install(Postgrest)
             install(Auth)
+            install(Functions)
         }
     }
 
@@ -43,5 +46,11 @@ object AppModule {
     @Singleton
     fun provideSupabasePostgrest(client: SupabaseClient): Postgrest {
         return client.postgrest
+    }
+
+    @Provides
+    @Singleton
+    fun provideSupabaseFunctions(client: SupabaseClient): Functions {
+        return client.functions
     }
 }

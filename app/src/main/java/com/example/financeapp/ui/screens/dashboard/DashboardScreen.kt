@@ -1,393 +1,441 @@
 package com.example.financeapp.ui.screens.dashboard
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.financeapp.data.model.MonthlySummary
-import com.example.financeapp.ui.components.HeroCard
-import com.example.financeapp.ui.components.TonalCard
-import com.example.financeapp.ui.theme.ExpenseRed
-import com.example.financeapp.ui.theme.IncomeGreen
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.financeapp.data.model.BudgetStatus
+import com.example.financeapp.ui.components.AlertBanner
+import com.example.financeapp.ui.components.AnimatedProgressBar
+import com.example.financeapp.ui.components.BudgetAlertItem
+import com.example.financeapp.ui.components.CategoryAvatar
+import com.example.financeapp.ui.components.RoundIconButton
+import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardUiState
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardViewModel
-import java.text.DateFormatSymbols
-import java.util.*
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.financeapp.ui.theme.FinanceAppTheme
+import com.example.financeapp.util.categoryIcon
+import com.example.financeapp.util.formatMoneyCLP
+import com.example.financeapp.util.monthYearLabel
+import com.example.financeapp.util.parseHexColor
+import kotlin.math.roundToInt
 
-@Preview(showBackground = true)
-@Composable
-fun DashboardPreview() {
-    FinanceAppTheme {
-        DashboardContent(
-            state = DashboardUiState.Success(
-                summary = MonthlySummary(balance = 1500.0, totalIncome = 3000.0, totalExpenses = 1500.0, savingsPct = 50.0),
-                budgetStatus = listOf(),
-                recentTransactions = listOf(),
-                currentYear = 2024,
-                currentMonth = 6
-            ),
-            onPreviousMonth = {},
-            onNextMonth = {}
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    viewModel: DashboardViewModel = hiltViewModel()
+    onNavigateToNewTransaction: () -> Unit,
+    onNavigateToAnalytics: () -> Unit,
+    onNavigateToUpcoming: () -> Unit,
+    viewModel: DashboardViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val haptic = LocalHapticFeedback.current
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
 
-    var showFintocSheet by remember { mutableStateOf(false) }
-
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { 
-                    Text(
-                        "Resumen Mensual",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { showFintocSheet = true }) {
-                        Icon(Icons.Default.AccountBalance, contentDescription = "Vincular Banco")
-                    }
-                    IconButton(onClick = { /* TODO: Open Notifications */ }) {
-                        Icon(Icons.Default.Notifications, contentDescription = null)
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                )
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            DashboardHeader(
+                monthLabel = monthYearLabel(state.currentYear, state.currentMonth),
+                onPrevious = viewModel::previousMonth,
+                onNext = viewModel::nextMonth,
+                onAnalytics = onNavigateToAnalytics,
+            )
+            DashboardBody(
+                state = state,
+                onNavigateToUpcoming = onNavigateToUpcoming,
             )
         }
-    ) { innerPadding ->
-        if (showFintocSheet) {
-            com.example.financeapp.ui.components.FintocBottomSheet(
-                onDismiss = { showFintocSheet = false },
-                onLinkSuccess = { 
-                    showFintocSheet = false
-                    // TODO: Refresh data
-                }
-            )
-        }
-        Box(modifier = Modifier.padding(innerPadding)) {
-            when (val state = uiState) {
-                is DashboardUiState.Loading -> {
-                    // TODO: Shimmer Loader
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                is DashboardUiState.Success -> {
-                    DashboardContent(
-                        state = state,
-                        onPreviousMonth = { 
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.previousMonth() 
-                        },
-                        onNextMonth = { 
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.nextMonth() 
-                        }
-                    )
-                }
-                is DashboardUiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = "Error: ${state.message}", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
+        ExtendedFloatingActionButton(
+            onClick = onNavigateToNewTransaction,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Agregar", fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-fun DashboardContent(
-    state: DashboardUiState.Success,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 80.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        // Month Selector
-        item {
-            MonthSelector(
-                year = state.currentYear,
-                month = state.currentMonth,
-                onPrevious = onPreviousMonth,
-                onNext = onNextMonth
-            )
-        }
-
-        // Hero Card (Net Balance)
-        item {
-            HeroBalanceCard(state.summary)
-        }
-
-        // Tonal Summary Cards (Income & Expense)
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                SummaryTonalCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Ingresos",
-                    amount = "$${state.summary?.totalIncome ?: 0.0}",
-                    icon = Icons.Default.TrendingUp,
-                    color = IncomeGreen
-                )
-                SummaryTonalCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Gastos",
-                    amount = "$${state.summary?.totalExpenses ?: 0.0}",
-                    icon = Icons.Default.TrendingDown,
-                    color = ExpenseRed
-                )
-            }
-        }
-
-        // Budget Status List
-        item {
-            Text(
-                text = "Estado del Presupuesto",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-        }
-
-        items(state.budgetStatus) { status ->
-            PremiumBudgetCard(status)
-        }
-
-        // Recent Transactions
-        item {
-            Text(
-                text = "Transacciones Recientes",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-        }
-
-        items(state.recentTransactions) { transaction ->
-            PremiumTransactionItem(transaction)
-        }
-    }
-}
-
-@Composable
-fun MonthSelector(
-    year: Int,
-    month: Int,
+private fun DashboardHeader(
+    monthLabel: String,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onAnalytics: () -> Unit,
 ) {
-    val locale = Locale.forLanguageTag("es-ES")
-    val monthName = DateFormatSymbols(locale).months[month - 1]
-    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-        }
-        Text(
-            text = "${monthName.replaceFirstChar { it.uppercase() }} $year",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        IconButton(onClick = onNext) {
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-        }
-    }
-}
-
-@Composable
-fun HeroBalanceCard(summary: MonthlySummary?) {
-    HeroCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-    ) {
-        Text(
-            text = "Balance Neto",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-        )
-        Text(
-            text = "$${summary?.balance ?: 0.0}",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Black,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Surface(
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
-            shape = CircleShape
-        ) {
+        RoundIconButton(Icons.Filled.ChevronLeft, onPrevious)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Ahorro: ${summary?.savingsPct ?: 0.0}% del ingreso",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
+                "PRESUPUESTO",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(monthLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RoundIconButton(Icons.Filled.ChevronRight, onNext)
+            Spacer(Modifier.width(8.dp))
+            RoundIconButton(
+                icon = Icons.Filled.BarChart,
+                onClick = onAnalytics,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
     }
 }
 
 @Composable
-fun SummaryTonalCard(
-    modifier: Modifier,
-    label: String,
-    amount: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color
+private fun DashboardBody(
+    state: DashboardUiState,
+    onNavigateToUpcoming: () -> Unit,
 ) {
-    TonalCard(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
-        Text(
-            text = amount,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
+    val finance = FinanceTheme.colors
+    val summary = state.summary
+    val balance = summary?.balance ?: 0.0
+    val income = summary?.totalIncome ?: 0.0
+    val expenses = summary?.totalExpenses ?: 0.0
+    val savings = summary?.savingsPct ?: 0.0
 
-@Composable
-fun PremiumBudgetCard(status: com.example.financeapp.data.model.BudgetStatus) {
-    val animatedProgress by animateFloatAsState(
-        targetValue = ((status.pctUsed ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f),
-        label = "progress"
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 110.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = status.categoryName ?: "Sin categoría",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${status.spent ?: 0.0} / ${status.budgetAmount ?: 0.0}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            LinearProgressIndicator(
-                progress = { animatedProgress },
+        // Hero balance
+        item {
+            Column(
                 modifier = Modifier
+                    .padding(horizontal = 20.dp)
                     .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(CircleShape),
-                color = when {
-                    (status.pctUsed ?: 0.0) >= 100.0 -> ExpenseRed
-                    (status.pctUsed ?: 0.0) >= 85.0 -> Color(0xFFFFC107)
-                    else -> IncomeGreen
-                },
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun PremiumTransactionItem(transaction: com.example.financeapp.data.model.Transaction) {
-    ListItem(
-        modifier = Modifier.padding(horizontal = 8.dp),
-        headlineContent = { 
-            Text(transaction.description, fontWeight = FontWeight.Bold) 
-        },
-        supportingContent = { 
-            Text(transaction.date.toString(), style = MaterialTheme.typography.bodySmall) 
-        },
-        trailingContent = {
-            Text(
-                text = "${if (transaction.type == "expense") "-" else "+"}$${transaction.amount}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = if (transaction.type == "expense") ExpenseRed else IncomeGreen
-            )
-        },
-        leadingContent = {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(24.dp),
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Text(
+                    "Balance neto",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                )
+                Text(
+                    if (state.isLoading) "—" else formatMoneyCLP(balance),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    color = if (balance < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Icon(
-                        imageVector = if (transaction.type == "expense") Icons.Default.TrendingDown else Icons.Default.TrendingUp,
-                        contentDescription = null,
-                        tint = if (transaction.type == "expense") ExpenseRed else IncomeGreen
+                        Icons.Filled.TrendingUp, null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        if (state.isLoading) "—" else "${"%.1f".format(savings)}% de ahorro",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
             }
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
+        }
+
+        // Alert banner
+        item {
+            val alertItems = state.budgetStatus.map {
+                BudgetAlertItem(
+                    id = it.categoryId ?: "",
+                    name = it.categoryName ?: "",
+                    budget = it.budgetAmount ?: 0.0,
+                    spent = it.spent ?: 0.0,
+                )
+            }
+            Box(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                AlertBanner(items = alertItems)
+            }
+        }
+
+        // Income / Expense
+        item {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TonalAmountCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Ingresos",
+                    amount = if (state.isLoading) "—" else formatMoneyCLP(income),
+                    container = finance.incomeContainer,
+                    onContainer = finance.onIncomeContainer,
+                    iconBg = finance.income,
+                    onIcon = finance.onIncome,
+                    icon = Icons.Filled.ArrowDownward,
+                )
+                TonalAmountCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Gastos",
+                    amount = if (state.isLoading) "—" else formatMoneyCLP(expenses),
+                    container = finance.expenseContainer,
+                    onContainer = finance.onExpenseContainer,
+                    iconBg = finance.expense,
+                    onIcon = finance.onExpense,
+                    icon = Icons.Filled.ArrowUpward,
+                )
+            }
+        }
+
+        // Próximos pagos access
+        item {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable { onNavigateToUpcoming() }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.CreditCard, null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                    Text("Próximos pagos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Cuotas de tus estados de cuenta",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForwardIos, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+
+        // Section header
+        item {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth().padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Estado del presupuesto", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    "${state.budgetStatus.size} categorías",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        if (state.isLoading) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else if (state.budgetStatus.isEmpty()) {
+            item { EmptyBudget() }
+        } else {
+            items(state.budgetStatus, key = { it.categoryId ?: it.categoryName ?: "" }) { cat ->
+                BudgetStatusCard(cat)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TonalAmountCard(
+    modifier: Modifier,
+    label: String,
+    amount: String,
+    container: Color,
+    onContainer: Color,
+    iconBg: Color,
+    onIcon: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(container)
+            .padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(30.dp).clip(CircleShape).background(iconBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = onIcon, modifier = Modifier.size(17.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = onContainer)
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(amount, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = onContainer)
+    }
+}
+
+@Composable
+private fun BudgetStatusCard(cat: BudgetStatus) {
+    val finance = FinanceTheme.colors
+    val status = cat.status ?: "ok"
+    val statusColor = when (status) {
+        "excedido" -> finance.expense
+        "advertencia" -> finance.warning
+        else -> finance.income
+    }
+    val statusIcon = when (status) {
+        "excedido" -> Icons.Filled.Error
+        "advertencia" -> Icons.Filled.Warning
+        else -> Icons.Filled.CheckCircle
+    }
+    val catColor = parseHexColor(cat.color, MaterialTheme.colorScheme.primary)
+    val spent = cat.spent ?: 0.0
+    val budget = cat.budgetAmount ?: 0.0
+    val pct = cat.pctUsed ?: 0.0
+
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 20.dp, vertical = 5.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CategoryAvatar(icon = categoryIcon(cat.icon), color = catColor)
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    cat.categoryName ?: "Sin categoría",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Row(
+                    modifier = Modifier.clip(CircleShape).background(statusColor.copy(alpha = 0.14f))
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(statusIcon, null, tint = statusColor, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("${pct.roundToInt()}%", style = MaterialTheme.typography.labelMedium, color = statusColor)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            AnimatedProgressBar(pct = pct, color = statusColor)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "${formatMoneyCLP(spent)} de ${formatMoneyCLP(budget)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (status == "excedido") {
+                    Text(
+                        "+${formatMoneyCLP(spent - budget)} excedido",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = finance.expense,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyBudget() {
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            Icons.Filled.PieChart, null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp),
+        )
+        Text("Sin presupuestos este mes", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Define montos por categoría en la pestaña Presupuesto para ver tu progreso aquí.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
 }
