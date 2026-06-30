@@ -48,9 +48,11 @@ class FinanceRepositoryImpl @Inject constructor(
 
     override suspend fun getBudgetStatus(year: Int, month: Int): List<BudgetStatus> =
         withContext(Dispatchers.IO) {
+            // Nota: la vista budget_status NO tiene columna sort_order (sí la tiene
+            // `categories`). Ordenamos por category_name para un orden estable.
             postgrest["budget_status"].select {
                 filter { eq("year", year); eq("month", month) }
-                order("sort_order", Order.ASCENDING)
+                order("category_name", Order.ASCENDING)
             }.decodeList<BudgetStatus>()
         }
 
@@ -173,10 +175,16 @@ class FinanceRepositoryImpl @Inject constructor(
     override suspend fun uploadStatementPdf(
         pdfBase64: String, filename: String, password: String?,
     ): StatementParseResult = withContext(Dispatchers.IO) {
-        val token = auth.currentAccessTokenOrNull()
-            ?: return@withContext StatementParseResult(
+        var token = auth.currentAccessTokenOrNull()
+        if (token == null) {
+            runCatching { auth.refreshCurrentSession() }
+            token = auth.currentAccessTokenOrNull()
+        }
+        if (token == null) {
+            return@withContext StatementParseResult(
                 ok = false, error = "Tu sesión expiró. Inicia sesión de nuevo.",
             )
+        }
         val payload = buildJsonObject {
             put("pdf_base64", pdfBase64)
             put("filename", filename)
