@@ -28,6 +28,7 @@ import com.example.financeapp.ui.viewmodel.auth.AuthMode
 import com.example.financeapp.ui.viewmodel.auth.AuthUiState
 import com.example.financeapp.ui.viewmodel.auth.AuthViewModel
 import com.example.financeapp.util.BiometricHelper
+import com.example.financeapp.util.LocalAppHaptics
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.financeapp.ui.theme.FinanceAppTheme
 
@@ -66,6 +67,7 @@ fun LoginContent(
     var passwordVisible by remember { mutableStateOf(false) }
     
     val haptic = LocalHapticFeedback.current
+    val appHaptics = LocalAppHaptics.current
     val context = LocalContext.current
     val activity = context as? FragmentActivity
 
@@ -187,7 +189,7 @@ fun LoginContent(
 
             Button(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    appHaptics?.medium()
                     if (authMode == AuthMode.LOGIN) {
                         onLogin(email, password)
                     } else {
@@ -217,6 +219,11 @@ fun LoginContent(
             uiState.error?.let {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            // Info Message (p. ej. confirmación de correo)
+            uiState.info?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
             }
 
             // Biometric Option

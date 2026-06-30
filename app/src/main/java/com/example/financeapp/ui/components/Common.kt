@@ -25,11 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.financeapp.util.LocalAppHaptics
 
 /** Botón redondo de cabecera (MD3 elevación por color). */
 @Composable
@@ -41,14 +40,14 @@ fun RoundIconButton(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     size: Dp = 44.dp,
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = LocalAppHaptics.current
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
             .background(container)
             .clickable {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                haptics?.selection()
                 onClick()
             },
         contentAlignment = Alignment.Center,

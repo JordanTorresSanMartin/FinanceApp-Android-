@@ -38,6 +38,7 @@ import com.example.financeapp.data.model.TxType
 import com.example.financeapp.ui.components.RoundIconButton
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.transactions.NewTransactionViewModel
+import com.example.financeapp.util.LocalAppHaptics
 
 @Composable
 fun NewTransactionScreen(
@@ -47,9 +48,10 @@ fun NewTransactionScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val haptics = LocalAppHaptics.current
 
     LaunchedEffect(Unit) { viewModel.setInitialType(initialType) }
-    LaunchedEffect(state.isSuccess) { if (state.isSuccess) onBack() }
+    LaunchedEffect(state.isSuccess) { if (state.isSuccess) { haptics?.success(); onBack() } }
     LaunchedEffect(state.error) {
         state.error?.let { snackbar.showSnackbar(it); viewModel.consumeError() }
     }
@@ -99,6 +101,7 @@ internal fun TransactionTopBar(
     saveLabel: String = "Guardar",
 ) {
     val finance = FinanceTheme.colors
+    val haptics = LocalAppHaptics.current
     val activeColor = if (type == TxType.GASTO) finance.expense else finance.income
     val onActive = if (type == TxType.GASTO) finance.onExpense else finance.onIncome
 
@@ -116,7 +119,7 @@ internal fun TransactionTopBar(
             modifier = Modifier
                 .clip(RoundedCornerShape(999.dp))
                 .background(activeColor)
-                .clickable(enabled = !saving) { onSave() }
+                .clickable(enabled = !saving) { haptics?.medium(); onSave() }
                 .padding(horizontal = 18.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
         ) {

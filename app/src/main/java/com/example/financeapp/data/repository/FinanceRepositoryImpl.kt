@@ -173,6 +173,10 @@ class FinanceRepositoryImpl @Inject constructor(
     override suspend fun uploadStatementPdf(
         pdfBase64: String, filename: String, password: String?,
     ): StatementParseResult = withContext(Dispatchers.IO) {
+        val token = auth.currentAccessTokenOrNull()
+            ?: return@withContext StatementParseResult(
+                ok = false, error = "Tu sesión expiró. Inicia sesión de nuevo.",
+            )
         val payload = buildJsonObject {
             put("pdf_base64", pdfBase64)
             put("filename", filename)
@@ -181,7 +185,12 @@ class FinanceRepositoryImpl @Inject constructor(
         val response = functions.invoke(
             function = "parse-statement",
             body = payload,
-            headers = Headers.build { append(HttpHeaders.ContentType, "application/json") },
+            headers = Headers.build {
+                append(HttpHeaders.ContentType, "application/json")
+                // Adjuntamos el JWT del usuario explícitamente: la Edge Function exige
+                // `Authorization: Bearer <jwt>` y hace getUser(jwt).
+                append(HttpHeaders.Authorization, "Bearer $token")
+            },
         )
         val obj: JsonObject = tolerantJson.parseToJsonElement(response.bodyAsText()).jsonObject
         StatementParseResult(

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.financeapp.ui.viewmodel.transactions.EditTransactionViewModel
+import com.example.financeapp.util.LocalAppHaptics
 
 @Composable
 fun EditTransactionScreen(
@@ -50,10 +51,11 @@ fun EditTransactionScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val haptics = LocalAppHaptics.current
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(transactionId) { viewModel.load(transactionId) }
-    LaunchedEffect(state.isSuccess) { if (state.isSuccess) onBack() }
+    LaunchedEffect(state.isSuccess) { if (state.isSuccess) { haptics?.success(); onBack() } }
     LaunchedEffect(state.notFound) { if (state.notFound) onBack() }
     LaunchedEffect(state.error) {
         state.error?.let { snackbar.showSnackbar(it); viewModel.consumeError() }

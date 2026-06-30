@@ -19,8 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -35,6 +33,7 @@ import com.example.financeapp.ui.screens.dashboard.DashboardScreen
 import com.example.financeapp.ui.screens.profile.ProfileScreen
 import com.example.financeapp.ui.screens.summary.AnnualSummaryScreen
 import com.example.financeapp.ui.screens.transactions.TransactionsScreen
+import com.example.financeapp.util.LocalAppHaptics
 
 private data class BottomNavItem(val label: String, val icon: ImageVector, val route: NavRoute)
 
@@ -49,7 +48,7 @@ fun MainScaffold(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val haptic = LocalHapticFeedback.current
+    val haptics = LocalAppHaptics.current
 
     val items = listOf(
         BottomNavItem("Dashboard", Icons.Filled.Dashboard, NavRoute.Dashboard),
@@ -76,7 +75,7 @@ fun MainScaffold(
                         },
                         selected = selected,
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            haptics?.selection()
                             navController.navigate(item.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true

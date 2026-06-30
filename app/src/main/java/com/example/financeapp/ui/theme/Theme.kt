@@ -11,11 +11,14 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.example.financeapp.util.AppHaptics
+import com.example.financeapp.util.LocalAppHaptics
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryDark,
@@ -97,6 +100,8 @@ fun FinanceAppTheme(
         else -> LightColorScheme
     }
     val financeColors = if (darkTheme) financeDarkColors else financeLightColors
+    val context = LocalContext.current
+    val haptics = remember(context) { AppHaptics(context) }
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -106,7 +111,10 @@ fun FinanceAppTheme(
         }
     }
 
-    CompositionLocalProvider(LocalFinanceColors provides financeColors) {
+    CompositionLocalProvider(
+        LocalFinanceColors provides financeColors,
+        LocalAppHaptics provides haptics,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             shapes = Shapes,

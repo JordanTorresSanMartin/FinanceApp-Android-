@@ -58,6 +58,7 @@ import com.example.financeapp.ui.components.RoundIconButton
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardUiState
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardViewModel
+import com.example.financeapp.util.LocalAppHaptics
 import com.example.financeapp.util.categoryIcon
 import com.example.financeapp.util.formatMoneyCLP
 import com.example.financeapp.util.monthYearLabel
@@ -72,6 +73,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = LocalAppHaptics.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -88,7 +90,7 @@ fun DashboardScreen(
             )
         }
         ExtendedFloatingActionButton(
-            onClick = onNavigateToNewTransaction,
+            onClick = { haptics?.medium(); onNavigateToNewTransaction() },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
@@ -154,6 +156,21 @@ private fun DashboardBody(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
+        state.error?.let { err ->
+            item {
+                Text(
+                    "No se pudieron cargar los datos: $err",
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        }
         // Hero balance
         item {
             Column(

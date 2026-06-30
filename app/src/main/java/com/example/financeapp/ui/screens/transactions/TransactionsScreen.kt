@@ -49,6 +49,7 @@ import com.example.financeapp.ui.components.CategoryAvatar
 import com.example.financeapp.ui.components.RoundIconButton
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.transactions.TransactionsViewModel
+import com.example.financeapp.util.LocalAppHaptics
 import com.example.financeapp.util.categoryIcon
 import com.example.financeapp.util.dayHeaderLabel
 import com.example.financeapp.util.formatMoneyCLP
@@ -65,6 +66,7 @@ fun TransactionsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
     val finance = FinanceTheme.colors
+    val haptics = LocalAppHaptics.current
 
     val grouped: List<Pair<LocalDate, List<Transaction>>> =
         state.filteredTransactions.groupBy { it.date }.toList()
@@ -128,6 +130,21 @@ fun TransactionsScreen(
             }
         }
 
+        // ── Error visible (diagnóstico) ──
+        state.error?.let { err ->
+            Text(
+                "No se pudieron cargar las transacciones: $err",
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(12.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+
         // ── List ──
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (state.filteredTransactions.isEmpty()) {
@@ -189,7 +206,7 @@ fun TransactionsScreen(
                     .size(48.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.primary)
-                    .clickable { onNavigateToNewTransaction() },
+                    .clickable { haptics?.medium(); onNavigateToNewTransaction() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.Add, "Agregar", tint = MaterialTheme.colorScheme.onPrimary)
@@ -202,11 +219,12 @@ fun TransactionsScreen(
 private fun FilterPill(
     label: String, selected: Boolean, selColor: Color, onSel: Color, onClick: () -> Unit,
 ) {
+    val haptics = LocalAppHaptics.current
     Box(
         modifier = Modifier
             .clip(CircleShape)
             .background(if (selected) selColor else MaterialTheme.colorScheme.surfaceContainer)
-            .clickable { onClick() }
+            .clickable { haptics?.selection(); onClick() }
             .padding(horizontal = 18.dp, vertical = 9.dp),
     ) {
         Text(
@@ -241,6 +259,7 @@ private fun DayHeader(label: String, total: Double) {
 @Composable
 private fun TransactionRow(tx: Transaction, onClick: () -> Unit) {
     val finance = FinanceTheme.colors
+    val haptics = LocalAppHaptics.current
     val isIncome = tx.type == TxType.INGRESO
     val catColor = parseHexColor(tx.categories?.color, MaterialTheme.colorScheme.primary)
     Row(
@@ -249,7 +268,7 @@ private fun TransactionRow(tx: Transaction, onClick: () -> Unit) {
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable { onClick() }
+            .clickable { haptics?.selection(); onClick() }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
