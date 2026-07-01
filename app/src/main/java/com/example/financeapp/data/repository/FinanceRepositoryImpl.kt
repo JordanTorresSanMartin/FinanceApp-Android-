@@ -211,6 +211,42 @@ class FinanceRepositoryImpl @Inject constructor(
         )
     }
 
+    // ── Pagos recurrentes ────────────────────────────────────────────────────
+    override suspend fun getRecurringPayments(): List<RecurringPayment> = withContext(Dispatchers.IO) {
+        postgrest["recurring_payments"].select(Columns.raw("*, categories(name,icon,color)")) {
+            filter { eq("active", true) }
+            order("name", Order.ASCENDING)
+        }.decodeList<RecurringPayment>()
+    }
+
+    override suspend fun upsertRecurringPayment(
+        id: String?, name: String, amount: Double, categoryId: String?,
+        frequency: String, billingDay: Int?, notes: String?,
+    ) {
+        withContext(Dispatchers.IO) {
+            val userId = requireUserId()
+            postgrest["recurring_payments"].upsert(
+                buildJsonObject {
+                    if (id != null) put("id", id)
+                    put("user_id", userId)
+                    put("name", name)
+                    put("amount", amount)
+                    put("category_id", categoryId)
+                    put("frequency", frequency)
+                    put("billing_day", billingDay)
+                    put("notes", notes)
+                    put("active", true)
+                }
+            )
+        }
+    }
+
+    override suspend fun deleteRecurringPayment(id: String) {
+        withContext(Dispatchers.IO) {
+            postgrest["recurring_payments"].delete { filter { eq("id", id) } }
+        }
+    }
+
     private fun requireUserId(): String =
         currentUserId() ?: throw IllegalStateException("Usuario no autenticado")
 

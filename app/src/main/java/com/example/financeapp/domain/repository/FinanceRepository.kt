@@ -34,4 +34,12 @@ interface FinanceRepository {
     suspend fun getStatements(): List<Statement>
     suspend fun getInstallments(statementIds: List<String>): List<Installment>
     suspend fun uploadStatementPdf(pdfBase64: String, filename: String, password: String?): StatementParseResult
+
+    // Pagos recurrentes (suscripciones, seguros, etc.)
+    suspend fun getRecurringPayments(): List<RecurringPayment>
+    suspend fun upsertRecurringPayment(
+        id: String?, name: String, amount: Double, categoryId: String?,
+        frequency: String, billingDay: Int?, notes: String?,
+    )
+    suspend fun deleteRecurringPayment(id: String)
 }

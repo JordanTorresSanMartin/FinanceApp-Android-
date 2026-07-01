@@ -126,6 +126,41 @@ data class Installment(
     val statements: StatementRef? = null,
 )
 
+// ── Pagos recurrentes (suscripciones, seguros, plan celular, etc.) ───────────
+
+object Frequency {
+    const val MENSUAL = "mensual"
+    const val ANUAL = "anual"
+    const val SEMANAL = "semanal"
+    const val QUINCENAL = "quincenal"
+    val ALL = listOf(MENSUAL, ANUAL, QUINCENAL, SEMANAL)
+}
+
+@Serializable
+data class RecurringPayment(
+    val id: String? = null,
+    val name: String,
+    val amount: Double,
+    @SerialName("category_id") val categoryId: String? = null,
+    val frequency: String = Frequency.MENSUAL,
+    @SerialName("billing_day") val billingDay: Int? = null,
+    @SerialName("next_due") val nextDue: LocalDate? = null,
+    val icon: String? = null,
+    val color: String? = null,
+    val active: Boolean = true,
+    val notes: String? = null,
+    val categories: CategoryRef? = null,
+) {
+    /** Equivalente mensual (para totalizar montos de distinta frecuencia). */
+    val monthlyEquivalent: Double
+        get() = when (frequency) {
+            Frequency.ANUAL -> amount / 12.0
+            Frequency.SEMANAL -> amount * 52.0 / 12.0
+            Frequency.QUINCENAL -> amount * 2.0
+            else -> amount
+        }
+}
+
 /** Resultado de invocar la Edge Function `parse-statement`. */
 data class StatementParseResult(
     val ok: Boolean,
