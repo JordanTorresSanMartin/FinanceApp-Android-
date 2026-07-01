@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -51,8 +52,8 @@ fun MainScaffold(
     val haptics = LocalAppHaptics.current
 
     val items = listOf(
-        BottomNavItem("Dashboard", Icons.Filled.Dashboard, NavRoute.Dashboard),
-        BottomNavItem("Transacciones", Icons.AutoMirrored.Filled.ListAlt, NavRoute.Transactions),
+        BottomNavItem("Inicio", Icons.Filled.Dashboard, NavRoute.Dashboard),
+        BottomNavItem("Historial", Icons.AutoMirrored.Filled.ListAlt, NavRoute.Transactions),
         BottomNavItem("Presupuesto", Icons.Filled.PieChart, NavRoute.Budgets),
         BottomNavItem("Resumen", Icons.Filled.BarChart, NavRoute.AnnualSummary),
         BottomNavItem("Perfil", Icons.Filled.AccountCircle, NavRoute.Profile),
@@ -69,8 +70,10 @@ fun MainScaffold(
                         label = {
                             Text(
                                 item.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         },
                         selected = selected,

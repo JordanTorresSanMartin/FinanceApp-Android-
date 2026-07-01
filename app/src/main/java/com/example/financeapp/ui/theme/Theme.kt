@@ -118,6 +118,7 @@ fun FinanceAppTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             shapes = Shapes,
+            typography = ExpressiveTypography,
             content = content
         )
     }
