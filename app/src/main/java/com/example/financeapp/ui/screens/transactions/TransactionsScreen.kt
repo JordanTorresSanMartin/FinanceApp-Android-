@@ -47,6 +47,7 @@ import com.example.financeapp.data.model.Transaction
 import com.example.financeapp.data.model.TxType
 import com.example.financeapp.ui.components.CategoryAvatar
 import com.example.financeapp.ui.components.RoundIconButton
+import com.example.financeapp.ui.components.pressable
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.transactions.TransactionsViewModel
 import com.example.financeapp.util.LocalAppHaptics
@@ -66,7 +67,6 @@ fun TransactionsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
     val finance = FinanceTheme.colors
-    val haptics = LocalAppHaptics.current
 
     val grouped: List<Pair<LocalDate, List<Transaction>>> =
         state.filteredTransactions.groupBy { it.date }.toList()
@@ -203,10 +203,10 @@ fun TransactionsScreen(
             Box(
                 modifier = Modifier
                     .padding(start = 12.dp)
+                    .pressable(onClick = onNavigateToNewTransaction, strongHaptic = true)
                     .size(48.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-                    .clickable { haptics?.medium(); onNavigateToNewTransaction() },
+                    .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.Add, "Agregar", tint = MaterialTheme.colorScheme.onPrimary)
@@ -219,12 +219,11 @@ fun TransactionsScreen(
 private fun FilterPill(
     label: String, selected: Boolean, selColor: Color, onSel: Color, onClick: () -> Unit,
 ) {
-    val haptics = LocalAppHaptics.current
     Box(
         modifier = Modifier
+            .pressable(onClick = onClick)
             .clip(CircleShape)
             .background(if (selected) selColor else MaterialTheme.colorScheme.surfaceContainer)
-            .clickable { haptics?.selection(); onClick() }
             .padding(horizontal = 18.dp, vertical = 9.dp),
     ) {
         Text(
@@ -259,16 +258,15 @@ private fun DayHeader(label: String, total: Double) {
 @Composable
 private fun TransactionRow(tx: Transaction, onClick: () -> Unit) {
     val finance = FinanceTheme.colors
-    val haptics = LocalAppHaptics.current
     val isIncome = tx.type == TxType.INGRESO
     val catColor = parseHexColor(tx.categories?.color, MaterialTheme.colorScheme.primary)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
+            .pressable(onClick = onClick)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable { haptics?.selection(); onClick() }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

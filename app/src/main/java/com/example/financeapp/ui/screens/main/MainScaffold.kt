@@ -104,7 +104,7 @@ fun MainScaffold(
         ) {
             composable<NavRoute.Dashboard> {
                 DashboardScreen(
-                    onNavigateToNewTransaction = { onNavigateToNewTransaction("gasto") },
+                    onNavigateToNewTransaction = onNavigateToNewTransaction,
                     onNavigateToAnalytics = onNavigateToAnalytics,
                     onNavigateToUpcoming = onNavigateToUpcoming,
                 )

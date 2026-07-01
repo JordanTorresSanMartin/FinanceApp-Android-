@@ -48,6 +48,7 @@ import com.example.financeapp.data.model.Frequency
 import com.example.financeapp.data.model.RecurringPayment
 import com.example.financeapp.data.model.TxType
 import com.example.financeapp.ui.components.CategoryAvatar
+import com.example.financeapp.ui.components.pressable
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.upcoming.RecurringUiState
 import com.example.financeapp.util.LocalAppHaptics
@@ -109,12 +110,11 @@ fun RecurringSection(
 
 @Composable
 private fun AddPill(onAdd: () -> Unit) {
-    val haptics = LocalAppHaptics.current
     Row(
         modifier = Modifier
+            .pressable(onClick = onAdd)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable { haptics?.selection(); onAdd() }
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -130,12 +130,12 @@ private fun RecurringItemCard(
     onEdit: (RecurringPayment) -> Unit,
     onRegister: (RecurringPayment) -> Unit,
 ) {
-    val haptics = LocalAppHaptics.current
     val color = parseHexColor(item.color ?: item.categories?.color, MaterialTheme.colorScheme.primary)
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+        modifier = Modifier.fillMaxWidth()
+            .pressable(onClick = { onEdit(item) })
+            .clip(RoundedCornerShape(24.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable { haptics?.selection(); onEdit(item) }
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -158,9 +158,10 @@ private fun RecurringItemCard(
         }
         Spacer(Modifier.height(12.dp))
         Row(
-            modifier = Modifier.fillMaxWidth().clip(CircleShape)
+            modifier = Modifier.fillMaxWidth()
+                .pressable(onClick = { onRegister(item) }, strongHaptic = true)
+                .clip(CircleShape)
                 .background(color.copy(alpha = 0.14f))
-                .clickable { haptics?.medium(); onRegister(item) }
                 .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,

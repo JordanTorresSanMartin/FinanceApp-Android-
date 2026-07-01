@@ -54,7 +54,9 @@ import com.example.financeapp.ui.components.AlertBanner
 import com.example.financeapp.ui.components.AnimatedProgressBar
 import com.example.financeapp.ui.components.BudgetAlertItem
 import com.example.financeapp.ui.components.CategoryAvatar
+import com.example.financeapp.ui.components.QuickAddFab
 import com.example.financeapp.ui.components.RoundIconButton
+import com.example.financeapp.ui.components.pressable
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardUiState
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardViewModel
@@ -67,13 +69,12 @@ import kotlin.math.roundToInt
 
 @Composable
 fun DashboardScreen(
-    onNavigateToNewTransaction: () -> Unit,
+    onNavigateToNewTransaction: (String) -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToUpcoming: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val haptics = LocalAppHaptics.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -89,16 +90,10 @@ fun DashboardScreen(
                 onNavigateToUpcoming = onNavigateToUpcoming,
             )
         }
-        ExtendedFloatingActionButton(
-            onClick = { haptics?.medium(); onNavigateToNewTransaction() },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+        QuickAddFab(
+            onSelectType = onNavigateToNewTransaction,
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Agregar", fontWeight = FontWeight.Bold)
-        }
+        )
     }
 }
 
@@ -265,9 +260,9 @@ private fun DashboardBody(
                 modifier = Modifier
                     .padding(horizontal = 20.dp, vertical = 16.dp)
                     .fillMaxWidth()
+                    .pressable(onClick = onNavigateToUpcoming)
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable { onNavigateToUpcoming() }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

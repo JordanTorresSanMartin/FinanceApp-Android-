@@ -39,8 +39,8 @@ import androidx.compose.ui.unit.dp
 import com.example.financeapp.data.model.Category
 import com.example.financeapp.data.model.TxType
 import com.example.financeapp.ui.components.CategoryAvatar
+import com.example.financeapp.ui.components.pressable
 import com.example.financeapp.ui.theme.FinanceTheme
-import com.example.financeapp.util.LocalAppHaptics
 import com.example.financeapp.util.categoryIcon
 import com.example.financeapp.util.groupThousands
 import com.example.financeapp.util.parseHexColor
@@ -68,7 +68,6 @@ fun TransactionFormBody(
     source: String? = null,
 ) {
     val finance = FinanceTheme.colors
-    val haptics = LocalAppHaptics.current
     val activeColor = if (type == TxType.GASTO) finance.expense else finance.income
     val onActive = if (type == TxType.GASTO) finance.onExpense else finance.onIncome
     val filtered = categories.filter { it.type == type || it.type == "ambos" }
@@ -106,7 +105,7 @@ fun TransactionFormBody(
                 selected = type == TxType.GASTO,
                 activeColor = activeColor,
                 onActive = onActive,
-            ) { haptics?.selection(); onTypeChange(TxType.GASTO) }
+            ) { onTypeChange(TxType.GASTO) }
             ToggleHalf(
                 modifier = Modifier.weight(1f),
                 label = "Ingreso",
@@ -114,7 +113,7 @@ fun TransactionFormBody(
                 selected = type == TxType.INGRESO,
                 activeColor = activeColor,
                 onActive = onActive,
-            ) { haptics?.selection(); onTypeChange(TxType.INGRESO) }
+            ) { onTypeChange(TxType.INGRESO) }
         }
 
         // Amount hero
@@ -183,10 +182,10 @@ fun TransactionFormBody(
                     val catColor = parseHexColor(cat.color, MaterialTheme.colorScheme.primary)
                     Row(
                         modifier = Modifier
+                            .pressable(onClick = { onCategorySelected(id) })
                             .clip(CircleShape)
                             .background(if (selected) catColor.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerLow)
                             .border(1.5.dp, if (selected) catColor else Color.Transparent, CircleShape)
-                            .clickable { haptics?.selection(); onCategorySelected(id) }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -223,9 +222,9 @@ private fun ToggleHalf(
 ) {
     Row(
         modifier = modifier
+            .pressable(onClick = onClick)
             .clip(CircleShape)
-            .background(if (selected) activeColor else Color.Transparent)
-            .clickable { onClick() },
+            .background(if (selected) activeColor else Color.Transparent),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {

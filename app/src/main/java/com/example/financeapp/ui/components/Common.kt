@@ -40,16 +40,12 @@ fun RoundIconButton(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     size: Dp = 44.dp,
 ) {
-    val haptics = LocalAppHaptics.current
     Box(
         modifier = modifier
+            .pressable(onClick = onClick)
             .size(size)
             .clip(CircleShape)
-            .background(container)
-            .clickable {
-                haptics?.selection()
-                onClick()
-            },
+            .background(container),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = contentColor)
