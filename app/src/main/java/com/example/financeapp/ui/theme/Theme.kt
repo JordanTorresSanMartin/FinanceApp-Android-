@@ -3,9 +3,7 @@ package com.example.financeapp.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -87,7 +85,6 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainerHighest = Color(0xFFE3E5E1),
 )
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FinanceAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -118,11 +115,15 @@ fun FinanceAppTheme(
         LocalFinanceColors provides financeColors,
         LocalAppHaptics provides haptics,
     ) {
-        // Tema Expressive oficial: además de color/shape/type, aplica la motion
-        // "resortada" (spring) a los componentes Material integrados.
-        MaterialExpressiveTheme(
+        // Look expressive con APIs estables: Material You + tipografía enfática +
+        // formas grandes. La motion resortada vive en Modifier.pressable y en las
+        // animaciones spring propias (QuickAddFab, progresos, toggles).
+        // NOTA: en este material3, MaterialExpressiveTheme/MotionScheme aún son
+        // `internal`. Cuando tu versión los exponga públicos, basta reemplazar
+        // esta llamada por:
+        //   MaterialExpressiveTheme(colorScheme, MotionScheme.expressive(), Shapes, ExpressiveTypography, content)
+        MaterialTheme(
             colorScheme = colorScheme,
-            motionScheme = MotionScheme.expressive(),
             shapes = Shapes,
             typography = ExpressiveTypography,
             content = content
