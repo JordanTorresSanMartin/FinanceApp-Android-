@@ -41,9 +41,31 @@ class FinanceRepositoryImpl @Inject constructor(
     // ── Resúmenes / presupuesto ──────────────────────────────────────────────
     override suspend fun getMonthlySummary(year: Int, month: Int): MonthlySummary? =
         withContext(Dispatchers.IO) {
-            postgrest["monthly_summary"].select {
-                filter { eq("year", year); eq("month", month) }
-            }.decodeSingleOrNull<MonthlySummary>()
+            // El saldo se ARRASTRA entre meses: julio no parte de 0, hereda lo que
+            // sobró de junio. La vista trae una fila por mes con movimientos; el
+            // acumulado se resuelve aquí para que un mes sin movimientos también
+            // herede el saldo anterior. (Una fila por mes: volumen mínimo.)
+            val all = postgrest["monthly_summary"].select().decodeList<MonthlySummary>()
+            val upTo = all.filter { s ->
+                val y = s.year ?: return@filter false
+                val m = s.month ?: return@filter false
+                y < year || (y == year && m <= month)
+            }.sortedWith(compareBy({ it.year ?: 0 }, { it.month ?: 0 }))
+            if (upTo.isEmpty()) return@withContext null
+
+            val cumulative = upTo.sumOf { it.balance ?: 0.0 }
+            val latest = upTo.last()
+            if (latest.year == year && latest.month == month) {
+                latest.copy(cumulativeBalance = cumulative)
+            } else {
+                // Mes sin movimientos: neto 0 pero con el acumulado heredado.
+                MonthlySummary(
+                    year = year, month = month,
+                    totalIncome = 0.0, totalExpenses = 0.0,
+                    balance = 0.0, savingsPct = 0.0,
+                    cumulativeBalance = cumulative,
+                )
+            }
         }
 
     override suspend fun getBudgetStatus(year: Int, month: Int): List<BudgetStatus> =

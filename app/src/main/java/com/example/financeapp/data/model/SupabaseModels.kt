@@ -81,6 +81,8 @@ data class MonthlySummary(
     @SerialName("total_expenses") val totalExpenses: Double? = null,
     val balance: Double? = null,
     @SerialName("savings_pct") val savingsPct: Double? = null,
+    /** Saldo acumulado hasta este mes (arrastre del sobrante de meses previos). Calculado en el repositorio. */
+    val cumulativeBalance: Double? = null,
 )
 
 // ── Estados de cuenta (PDF) → "Próximos pagos" ───────────────────────────────

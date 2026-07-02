@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.BarChart
@@ -30,10 +29,10 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -60,11 +59,11 @@ import com.example.financeapp.ui.components.pressable
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardUiState
 import com.example.financeapp.ui.viewmodel.dashboard.DashboardViewModel
-import com.example.financeapp.util.LocalAppHaptics
 import com.example.financeapp.util.categoryIcon
 import com.example.financeapp.util.formatMoneyCLP
 import com.example.financeapp.util.monthYearLabel
 import com.example.financeapp.util.parseHexColor
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
@@ -141,7 +140,8 @@ private fun DashboardBody(
 ) {
     val finance = FinanceTheme.colors
     val summary = state.summary
-    val balance = summary?.balance ?: 0.0
+    val monthNet = summary?.balance ?: 0.0
+    val cumulative = summary?.cumulativeBalance ?: monthNet
     val income = summary?.totalIncome ?: 0.0
     val expenses = summary?.totalExpenses ?: 0.0
     val savings = summary?.savingsPct ?: 0.0
@@ -177,15 +177,15 @@ private fun DashboardBody(
                     .padding(24.dp),
             ) {
                 Text(
-                    "Balance neto",
+                    "Saldo total",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                 )
                 Text(
-                    if (state.isLoading) "—" else formatMoneyCLP(balance),
+                    if (state.isLoading) "—" else formatMoneyCLP(cumulative),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Black,
-                    color = if (balance < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = if (cumulative < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(
@@ -196,13 +196,14 @@ private fun DashboardBody(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        Icons.Filled.TrendingUp, null,
+                        if (monthNet >= 0) Icons.Filled.TrendingUp else Icons.Filled.TrendingDown, null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        if (state.isLoading) "—" else "${"%.1f".format(savings)}% de ahorro",
+                        if (state.isLoading) "—"
+                        else "Este mes ${if (monthNet >= 0) "+" else "-"}${formatMoneyCLP(abs(monthNet))} · ${"%.1f".format(savings)}% ahorro",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
