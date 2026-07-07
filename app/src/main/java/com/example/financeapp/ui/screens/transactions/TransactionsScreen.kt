@@ -47,6 +47,7 @@ import com.example.financeapp.data.model.Transaction
 import com.example.financeapp.data.model.TxType
 import com.example.financeapp.ui.components.CategoryAvatar
 import com.example.financeapp.ui.components.RoundIconButton
+import com.example.financeapp.ui.components.groupedItemShape
 import com.example.financeapp.ui.components.pressable
 import com.example.financeapp.ui.theme.FinanceTheme
 import com.example.financeapp.ui.viewmodel.transactions.TransactionsViewModel
@@ -178,9 +179,11 @@ fun TransactionsScreen(
                         item(key = "h-$date") {
                             DayHeader(label = dayHeaderLabel(date), total = dayTotal)
                         }
-                        items.forEach { tx ->
-                            item(key = tx.id ?: (tx.description + date)) {
-                                TransactionRow(tx) { tx.id?.let(onNavigateToEditTransaction) }
+                        items.forEachIndexed { idx, tx ->
+                            item(key = tx.id ?: (tx.description + date + idx)) {
+                                TransactionRow(tx, shape = groupedItemShape(idx, items.size)) {
+                                    tx.id?.let(onNavigateToEditTransaction)
+                                }
                             }
                         }
                     }
@@ -256,16 +259,16 @@ private fun DayHeader(label: String, total: Double) {
 }
 
 @Composable
-private fun TransactionRow(tx: Transaction, onClick: () -> Unit) {
+private fun TransactionRow(tx: Transaction, shape: RoundedCornerShape, onClick: () -> Unit) {
     val finance = FinanceTheme.colors
     val isIncome = tx.type == TxType.INGRESO
     val catColor = parseHexColor(tx.categories?.color, MaterialTheme.colorScheme.primary)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
             .pressable(onClick = onClick)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,

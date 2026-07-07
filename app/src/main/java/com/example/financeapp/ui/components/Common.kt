@@ -136,3 +136,19 @@ fun AnimatedProgressBar(
         )
     }
 }
+
+/**
+ * Forma "expressive" para ítems de lista agrupados (estilo Android 16):
+ * los extremos del grupo van muy redondeados y los bordes interiores suaves,
+ * de modo que cada grupo de día se lee como una sola pieza.
+ */
+fun groupedItemShape(index: Int, count: Int): RoundedCornerShape {
+    val big = 24.dp
+    val small = 6.dp
+    return when {
+        count <= 1 -> RoundedCornerShape(big)
+        index == 0 -> RoundedCornerShape(topStart = big, topEnd = big, bottomStart = small, bottomEnd = small)
+        index == count - 1 -> RoundedCornerShape(topStart = small, topEnd = small, bottomStart = big, bottomEnd = big)
+        else -> RoundedCornerShape(small)
+    }
+}

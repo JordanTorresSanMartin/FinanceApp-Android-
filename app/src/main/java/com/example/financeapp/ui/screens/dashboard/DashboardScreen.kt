@@ -183,8 +183,9 @@ private fun DashboardBody(
                 )
                 Text(
                     if (state.isLoading) "—" else formatMoneyCLP(cumulative),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Black,
+                    maxLines = 1,
                     color = if (cumulative < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Spacer(Modifier.height(12.dp))

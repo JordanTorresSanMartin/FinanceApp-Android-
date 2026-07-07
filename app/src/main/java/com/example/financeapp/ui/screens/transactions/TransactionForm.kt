@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -69,7 +70,6 @@ fun TransactionFormBody(
 ) {
     val finance = FinanceTheme.colors
     val activeColor = if (type == TxType.GASTO) finance.expense else finance.income
-    val onActive = if (type == TxType.GASTO) finance.onExpense else finance.onIncome
     val filtered = categories.filter { it.type == type || it.type == "ambos" }
 
     Column(
@@ -88,31 +88,33 @@ fun TransactionFormBody(
             )
         }
 
-        // Type toggle
+        // Type toggle — segmentado tonal M3: el seleccionado usa su container
+        // semántico (suave), no un relleno saturado, y llena toda la altura.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
+                .height(56.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             ToggleHalf(
                 modifier = Modifier.weight(1f),
                 label = "Gasto",
                 icon = Icons.Filled.ArrowUpward,
                 selected = type == TxType.GASTO,
-                activeColor = activeColor,
-                onActive = onActive,
+                container = finance.expenseContainer,
+                onContainer = finance.onExpenseContainer,
             ) { onTypeChange(TxType.GASTO) }
             ToggleHalf(
                 modifier = Modifier.weight(1f),
                 label = "Ingreso",
                 icon = Icons.Filled.ArrowDownward,
                 selected = type == TxType.INGRESO,
-                activeColor = activeColor,
-                onActive = onActive,
+                container = finance.incomeContainer,
+                onContainer = finance.onIncomeContainer,
             ) { onTypeChange(TxType.INGRESO) }
         }
 
@@ -216,28 +218,30 @@ private fun ToggleHalf(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
-    activeColor: Color,
-    onActive: Color,
+    container: Color,
+    onContainer: Color,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = modifier
+            .fillMaxHeight()
             .pressable(onClick = onClick)
             .clip(CircleShape)
-            .background(if (selected) activeColor else Color.Transparent),
+            .background(if (selected) container else Color.Transparent),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             icon, null,
-            tint = if (selected) onActive else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (selected) onContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(6.dp))
         Text(
             label,
             style = MaterialTheme.typography.titleSmall,
-            color = if (selected) onActive else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) onContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
