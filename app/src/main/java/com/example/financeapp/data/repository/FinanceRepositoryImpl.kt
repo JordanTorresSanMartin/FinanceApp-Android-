@@ -4,7 +4,6 @@ import com.example.financeapp.data.model.*
 import com.example.financeapp.domain.repository.FinanceRepository
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.functions.Functions
-import io.github.jan.supabase.functions.invoke
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
