@@ -16,6 +16,7 @@ enum class AuthMode { LOGIN, REGISTER }
 data class AuthUiState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
+    val info: String? = null,
     val error: String? = null
 )
 
@@ -32,7 +33,7 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState(isLoading = true)
             try {
                 auth.signInWith(Email) {
-                    this.email = email
+                    this.email = email.trim().lowercase()
                     this.password = password
                 }
                 _uiState.value = AuthUiState(isSuccess = true)
@@ -47,17 +48,25 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState(isLoading = true)
             try {
                 auth.signUpWith(Email) {
-                    this.email = email
+                    this.email = email.trim().lowercase()
                     this.password = password
                 }
-                _uiState.value = AuthUiState(isSuccess = true)
+                // Con confirmación de correo activada, signUp NO crea sesión: no
+                // navegamos a la app sin sesión (causaría datos vacíos y 401).
+                if (auth.currentSessionOrNull() != null) {
+                    _uiState.value = AuthUiState(isSuccess = true)
+                } else {
+                    _uiState.value = AuthUiState(info = "Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.")
+                }
             } catch (e: Exception) {
                 _uiState.value = AuthUiState(error = e.message ?: "Error al registrarse")
             }
         }
     }
 
-    fun isUserLoggedIn(): Boolean {
+    /** Espera a que la sesión persistida termine de cargar antes de decidir la ruta. */
+    suspend fun isUserLoggedIn(): Boolean {
+        runCatching { auth.awaitInitialization() }
         return auth.currentSessionOrNull() != null
     }
 

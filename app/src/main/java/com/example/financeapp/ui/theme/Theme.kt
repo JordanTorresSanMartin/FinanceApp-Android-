@@ -9,11 +9,16 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.example.financeapp.util.AppHaptics
+import com.example.financeapp.util.LocalAppHaptics
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryDark,
@@ -38,7 +43,14 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = OnSurfaceDark,
     surfaceVariant = SurfaceVariantDark,
     onSurfaceVariant = OnSurfaceVariantDark,
-    outline = OutlineDark
+    outline = OutlineDark,
+    outlineVariant = Color(0xFF404943),
+    // Elevación por color (MD3): contenedores de superficie por nivel.
+    surfaceContainerLowest = Color(0xFF0E1210),
+    surfaceContainerLow = Color(0xFF191C1A),
+    surfaceContainer = Color(0xFF1D211F),
+    surfaceContainerHigh = Color(0xFF282B29),
+    surfaceContainerHighest = Color(0xFF333634),
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -64,7 +76,13 @@ private val LightColorScheme = lightColorScheme(
     onSurface = OnSurfaceLight,
     surfaceVariant = SurfaceVariantLight,
     onSurfaceVariant = OnSurfaceVariantLight,
-    outline = OutlineLight
+    outline = OutlineLight,
+    outlineVariant = Color(0xFFBFC9C1),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF5F7F3),
+    surfaceContainer = Color(0xFFEFF1ED),
+    surfaceContainerHigh = Color(0xFFE9EBE7),
+    surfaceContainerHighest = Color(0xFFE3E5E1),
 )
 
 @Composable
@@ -81,17 +99,34 @@ fun FinanceAppTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
+    val financeColors = if (darkTheme) financeDarkColors else financeLightColors
+    val context = LocalContext.current
+    val haptics = remember(context) { AppHaptics(context) }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalFinanceColors provides financeColors,
+        LocalAppHaptics provides haptics,
+    ) {
+        // Look expressive con APIs estables: Material You + tipografía enfática +
+        // formas grandes. La motion resortada vive en Modifier.pressable y en las
+        // animaciones spring propias (QuickAddFab, progresos, toggles).
+        // NOTA: en este material3, MaterialExpressiveTheme/MotionScheme aún son
+        // `internal`. Cuando tu versión los exponga públicos, basta reemplazar
+        // esta llamada por:
+        //   MaterialExpressiveTheme(colorScheme, MotionScheme.expressive(), Shapes, ExpressiveTypography, content)
+        MaterialTheme(
+            colorScheme = colorScheme,
+            shapes = Shapes,
+            typography = ExpressiveTypography,
+            content = content
+        )
+    }
 }

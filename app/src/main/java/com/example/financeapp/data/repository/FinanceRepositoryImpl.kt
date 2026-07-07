@@ -2,95 +2,278 @@ package com.example.financeapp.data.repository
 
 import com.example.financeapp.data.model.*
 import com.example.financeapp.domain.repository.FinanceRepository
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 
+private const val TX_WITH_CATEGORY = "*, categories(name,icon,color)"
+private val tolerantJson = Json { ignoreUnknownKeys = true }
+
 class FinanceRepositoryImpl @Inject constructor(
-    private val postgrest: Postgrest
+    private val postgrest: Postgrest,
+    private val auth: Auth,
+    private val functions: Functions,
 ) : FinanceRepository {
 
-    override suspend fun getMonthlySummary(year: Int, month: Int): MonthlySummary? = withContext(Dispatchers.IO) {
-        val response = postgrest["monthly_summary"]
-            .select {
-                filter {
-                    eq("year", year)
-                    eq("month", month)
-                }
-            }
-        response.decodeSingleOrNull<MonthlySummary>()
-    }
+    override fun currentUserId(): String? = auth.currentUserOrNull()?.id
+    override fun currentUserEmail(): String? = auth.currentUserOrNull()?.email
+    override suspend fun signOut() = auth.signOut()
 
-    override suspend fun getBudgetStatus(year: Int, month: Int): List<BudgetStatus> = withContext(Dispatchers.IO) {
-        val response = postgrest["budget_status"]
-            .select {
-                filter {
-                    eq("year", year)
-                    eq("month", month)
-                }
-            }
-        response.decodeList<BudgetStatus>()
-    }
-
-    override suspend fun getRecentTransactions(limit: Long): List<Transaction> = withContext(Dispatchers.IO) {
-        val response = postgrest["transactions"]
-            .select {
-                range(0, limit - 1)
-                order("date", Order.DESCENDING)
-            }
-        response.decodeList<Transaction>()
-    }
-
-    override suspend fun getTransactionsByMonth(year: Int, month: Int): List<Transaction> = withContext(Dispatchers.IO) {
-        val startDate = LocalDate(year, month, 1)
-        val lastDay = when (month) {
-            4, 6, 9, 11 -> 30
-            2 -> if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) 29 else 28
-            else -> 31
-        }
-        val endDate = LocalDate(year, month, lastDay)
-        
-        val response = postgrest["transactions"]
-            .select {
-                filter {
-                    gte("date", startDate)
-                    lte("date", endDate)
-                }
-                order("date", Order.DESCENDING)
-            }
-        response.decodeList<Transaction>()
-    }
-
-    override suspend fun getCategories(): List<Category> = withContext(Dispatchers.IO) {
-        val response = postgrest["categories"].select()
-        response.decodeList<Category>()
-    }
-
-    override suspend fun insertTransaction(transaction: Transaction) {
+    // ── Resúmenes / presupuesto ──────────────────────────────────────────────
+    override suspend fun getMonthlySummary(year: Int, month: Int): MonthlySummary? =
         withContext(Dispatchers.IO) {
-            postgrest["transactions"].insert(transaction)
-        }
-    }
+            // El saldo se ARRASTRA entre meses: julio no parte de 0, hereda lo que
+            // sobró de junio. La vista trae una fila por mes con movimientos; el
+            // acumulado se resuelve aquí para que un mes sin movimientos también
+            // herede el saldo anterior. (Una fila por mes: volumen mínimo.)
+            val all = postgrest["monthly_summary"].select().decodeList<MonthlySummary>()
+            val upTo = all.filter { s ->
+                val y = s.year ?: return@filter false
+                val m = s.month ?: return@filter false
+                y < year || (y == year && m <= month)
+            }.sortedWith(compareBy({ it.year ?: 0 }, { it.month ?: 0 }))
+            if (upTo.isEmpty()) return@withContext null
 
-    override suspend fun upsertBudget(budget: Budget) {
-        withContext(Dispatchers.IO) {
-            postgrest["budgets"].upsert(budget) {
-                onConflict = "category_id,year,month"
+            val cumulative = upTo.sumOf { it.balance ?: 0.0 }
+            val latest = upTo.last()
+            if (latest.year == year && latest.month == month) {
+                latest.copy(cumulativeBalance = cumulative)
+            } else {
+                // Mes sin movimientos: neto 0 pero con el acumulado heredado.
+                MonthlySummary(
+                    year = year, month = month,
+                    totalIncome = 0.0, totalExpenses = 0.0,
+                    balance = 0.0, savingsPct = 0.0,
+                    cumulativeBalance = cumulative,
+                )
             }
         }
-    }
 
-    override suspend fun getAnnualSummary(year: Int): List<MonthlySummary> = withContext(Dispatchers.IO) {
-        val response = postgrest["monthly_summary"]
-            .select {
-                filter {
-                    eq("year", year)
-                }
+    override suspend fun getBudgetStatus(year: Int, month: Int): List<BudgetStatus> =
+        withContext(Dispatchers.IO) {
+            // Nota: la vista budget_status NO tiene columna sort_order (sí la tiene
+            // `categories`). Ordenamos por category_name para un orden estable.
+            postgrest["budget_status"].select {
+                filter { eq("year", year); eq("month", month) }
+                order("category_name", Order.ASCENDING)
+            }.decodeList<BudgetStatus>()
+        }
+
+    override suspend fun getAnnualSummary(year: Int): List<MonthlySummary> =
+        withContext(Dispatchers.IO) {
+            postgrest["monthly_summary"].select {
+                filter { eq("year", year) }
                 order("month", Order.ASCENDING)
-            }
-        response.decodeList<MonthlySummary>()
+            }.decodeList<MonthlySummary>()
+        }
+
+    override suspend fun getBudgetsForMonth(year: Int, month: Int): List<Budget> =
+        withContext(Dispatchers.IO) {
+            postgrest["budgets"].select {
+                filter { eq("year", year); eq("month", month) }
+            }.decodeList<Budget>()
+        }
+
+    override suspend fun upsertBudget(categoryId: String, year: Int, month: Int, amount: Double) {
+        withContext(Dispatchers.IO) {
+            val userId = requireUserId()
+            postgrest["budgets"].upsert(
+                buildJsonObject {
+                    put("user_id", userId)
+                    put("category_id", categoryId)
+                    put("year", year)
+                    put("month", month)
+                    put("amount", amount)
+                }
+            ) { onConflict = "user_id,category_id,year,month" }
+        }
+    }
+
+    // ── Categorías / transacciones ───────────────────────────────────────────
+    override suspend fun getCategories(): List<Category> = withContext(Dispatchers.IO) {
+        postgrest["categories"].select {
+            order("sort_order", Order.ASCENDING)
+        }.decodeList<Category>()
+    }
+
+    override suspend fun getTransactionsByMonth(year: Int, month: Int): List<Transaction> =
+        withContext(Dispatchers.IO) {
+            val start = LocalDate(year, month, 1)
+            val end = LocalDate(year, month, lastDayOfMonth(year, month))
+            postgrest["transactions"].select(Columns.raw(TX_WITH_CATEGORY)) {
+                filter { gte("date", start); lte("date", end) }
+                order("date", Order.DESCENDING)
+            }.decodeList<Transaction>()
+        }
+
+    override suspend fun getTransactionById(id: String): Transaction? =
+        withContext(Dispatchers.IO) {
+            postgrest["transactions"].select(Columns.raw(TX_WITH_CATEGORY)) {
+                filter { eq("id", id) }
+            }.decodeSingleOrNull<Transaction>()
+        }
+
+    override suspend fun insertTransaction(
+        date: LocalDate, description: String, categoryId: String?,
+        type: String, amount: Double, notes: String?,
+    ) {
+        withContext(Dispatchers.IO) {
+            val userId = requireUserId()
+            postgrest["transactions"].insert(
+                buildJsonObject {
+                    put("user_id", userId)
+                    put("date", date.toString())
+                    put("description", description)
+                    put("category_id", categoryId)
+                    put("type", type)
+                    put("amount", amount)
+                    put("notes", notes)
+                }
+            )
+        }
+    }
+
+    override suspend fun updateTransaction(
+        id: String, date: LocalDate, description: String, categoryId: String?,
+        type: String, amount: Double, notes: String?,
+    ) {
+        withContext(Dispatchers.IO) {
+            postgrest["transactions"].update(
+                buildJsonObject {
+                    put("date", date.toString())
+                    put("description", description)
+                    put("category_id", categoryId)
+                    put("type", type)
+                    put("amount", amount)
+                    put("notes", notes)
+                }
+            ) { filter { eq("id", id) } }
+        }
+    }
+
+    override suspend fun deleteTransaction(id: String) {
+        withContext(Dispatchers.IO) {
+            postgrest["transactions"].delete { filter { eq("id", id) } }
+        }
+    }
+
+    // ── Estados de cuenta (PDF) ──────────────────────────────────────────────
+    override suspend fun getStatements(): List<Statement> = withContext(Dispatchers.IO) {
+        postgrest["statements"].select {
+            order("statement_date", Order.DESCENDING)
+        }.decodeList<Statement>()
+    }
+
+    override suspend fun getInstallments(statementIds: List<String>): List<Installment> =
+        withContext(Dispatchers.IO) {
+            if (statementIds.isEmpty()) return@withContext emptyList()
+            postgrest["installments"].select(
+                Columns.raw("*, categories(name,icon,color), statements(bank,card_last4)")
+            ) {
+                filter { isIn("statement_id", statementIds) }
+                order("monthly_amount", Order.DESCENDING)
+            }.decodeList<Installment>()
+        }
+
+    override suspend fun uploadStatementPdf(
+        pdfBase64: String, filename: String, password: String?,
+    ): StatementParseResult = withContext(Dispatchers.IO) {
+        var token = auth.currentAccessTokenOrNull()
+        if (token == null) {
+            runCatching { auth.refreshCurrentSession() }
+            token = auth.currentAccessTokenOrNull()
+        }
+        if (token == null) {
+            return@withContext StatementParseResult(
+                ok = false, error = "Tu sesión expiró. Inicia sesión de nuevo.",
+            )
+        }
+        val payload = buildJsonObject {
+            put("pdf_base64", pdfBase64)
+            put("filename", filename)
+            if (password != null) put("password", password)
+        }
+        val response = functions.invoke(
+            function = "parse-statement",
+            body = payload,
+            headers = Headers.build {
+                append(HttpHeaders.ContentType, "application/json")
+                // Adjuntamos el JWT del usuario explícitamente: la Edge Function exige
+                // `Authorization: Bearer <jwt>` y hace getUser(jwt).
+                append(HttpHeaders.Authorization, "Bearer $token")
+            },
+        )
+        val obj: JsonObject = tolerantJson.parseToJsonElement(response.bodyAsText()).jsonObject
+        StatementParseResult(
+            ok = obj["ok"]?.jsonPrimitive?.booleanOrNull ?: false,
+            code = obj["code"]?.jsonPrimitive?.contentOrNull,
+            error = obj["error"]?.jsonPrimitive?.contentOrNull,
+            bank = obj["bank"]?.jsonPrimitive?.contentOrNull,
+            cardLast4 = obj["card_last4"]?.jsonPrimitive?.contentOrNull,
+            installments = obj["installments"]?.jsonPrimitive?.intOrNull ?: 0,
+        )
+    }
+
+    // ── Pagos recurrentes ────────────────────────────────────────────────────
+    override suspend fun getRecurringPayments(): List<RecurringPayment> = withContext(Dispatchers.IO) {
+        postgrest["recurring_payments"].select(Columns.raw("*, categories(name,icon,color)")) {
+            filter { eq("active", true) }
+            order("name", Order.ASCENDING)
+        }.decodeList<RecurringPayment>()
+    }
+
+    override suspend fun upsertRecurringPayment(
+        id: String?, name: String, amount: Double, categoryId: String?,
+        frequency: String, billingDay: Int?, notes: String?,
+    ) {
+        withContext(Dispatchers.IO) {
+            val userId = requireUserId()
+            postgrest["recurring_payments"].upsert(
+                buildJsonObject {
+                    if (id != null) put("id", id)
+                    put("user_id", userId)
+                    put("name", name)
+                    put("amount", amount)
+                    put("category_id", categoryId)
+                    put("frequency", frequency)
+                    put("billing_day", billingDay)
+                    put("notes", notes)
+                    put("active", true)
+                }
+            )
+        }
+    }
+
+    override suspend fun deleteRecurringPayment(id: String) {
+        withContext(Dispatchers.IO) {
+            postgrest["recurring_payments"].delete { filter { eq("id", id) } }
+        }
+    }
+
+    private fun requireUserId(): String =
+        currentUserId() ?: throw IllegalStateException("Usuario no autenticado")
+
+    private fun lastDayOfMonth(year: Int, month: Int): Int = when (month) {
+        4, 6, 9, 11 -> 30
+        2 -> if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) 29 else 28
+        else -> 31
     }
 }
