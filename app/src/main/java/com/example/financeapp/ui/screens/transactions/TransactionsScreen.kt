@@ -170,7 +170,9 @@ fun TransactionsScreen(
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
             if (state.isLoading && state.transactions.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    com.example.financeapp.ui.components.SkeletonCardList(rows = 8)
+                }
             } else if (state.filteredTransactions.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(40.dp),

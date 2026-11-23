@@ -1,5 +1,8 @@
 package com.example.financeapp.ui.screens.upcoming
 
+import com.example.financeapp.ui.components.SkeletonCardList
+import com.example.financeapp.ui.components.SkeletonScope
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,6 +40,7 @@ import java.time.LocalDate
 @Composable
 internal fun CuotasPage(
     plans: List<InstallmentPlan>,
+    loading: Boolean,
     contentPadding: PaddingValues,
     onAdd: () -> Unit,
     onEdit: (InstallmentPlan) -> Unit,
@@ -53,7 +57,9 @@ internal fun CuotasPage(
             PageIntro("Compras en cuotas que sigues tú. Márcalas al pagar.") { AddPill(onAdd, "Agregar compra en cuotas") }
             Spacer(Modifier.height(8.dp))
         }
-        if (plans.isEmpty()) {
+        if (plans.isEmpty() && loading) {
+            item(key = "skeleton") { SkeletonScope { SkeletonCardList(rows = 3) } }
+        } else if (plans.isEmpty()) {
             item(key = "empty") {
                 EmptyPage(
                     Icons.Filled.CreditCard, "Sigue tus compras en cuotas",

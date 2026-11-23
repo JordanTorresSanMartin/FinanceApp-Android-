@@ -1,5 +1,15 @@
 package com.example.financeapp.ui.screens.upcoming
 
+import com.example.financeapp.ui.components.Bone
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import com.example.financeapp.notifications.DueAlerts
+import com.example.financeapp.ui.components.SkeletonCardList
+import com.example.financeapp.ui.components.SkeletonChart
+import com.example.financeapp.ui.components.SkeletonHero
+import com.example.financeapp.ui.components.SkeletonScope
+
 import com.example.financeapp.util.LocalAppHaptics
 import com.example.financeapp.ui.viewmodel.upcoming.InstallmentsViewModel
 import com.example.financeapp.domain.InstallmentPlan
@@ -108,6 +118,7 @@ fun UpcomingScreen(
     cuotasVm: InstallmentsViewModel = hiltViewModel(),
 ) {
     val plans by cuotasVm.plans.collectAsStateWithLifecycle()
+    val cuotasLoading by cuotasVm.loading.collectAsStateWithLifecycle()
     var planEditorOpen by remember { mutableStateOf(false) }
     var editingPlan by remember { mutableStateOf<InstallmentPlan?>(null) }
     val haptics = LocalAppHaptics.current
@@ -131,6 +142,18 @@ fun UpcomingScreen(
         }
     }
     val pickPdf = { picker.launch(arrayOf("application/pdf")) }
+
+    // Aviso en vivo de pagos de hoy: se pide el permiso aquí, donde se entiende para qué es.
+    val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) DueAlerts.checkNow(context)
+    }
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+    // Tras pagar (o al cargar) se recalcula el aviso; WorkManager funde llamadas seguidas.
+    LaunchedEffect(plans, recurring.items) { if (!recurring.isLoading) DueAlerts.checkNow(context) }
 
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); viewModel.consumeMessage() } }
     LaunchedEffect(recurring.message) { recurring.message?.let { snackbar.showSnackbar(it); recurringVm.consumeMessage() } }
@@ -165,7 +188,8 @@ fun UpcomingScreen(
                 Text("Próximos pagos", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
-            MonthOverview(
+            if (recurring.isLoading || (cuotasLoading && plans.isEmpty())) SkeletonScope(Modifier.padding(horizontal = 20.dp)) { SkeletonHero(height = 128.dp) }
+            else MonthOverview(
                 pending = pendingCuotasAmount + recurring.pendingAmount,
                 cuotas = pendingCuotasAmount,
                 fijos = recurring.pendingAmount,
@@ -216,6 +240,7 @@ fun UpcomingScreen(
                 when (tabs[page]) {
                     UpcomingTab.CUOTAS -> CuotasPage(
                         plans = plans,
+                        loading = cuotasLoading,
                         contentPadding = pageInsets,
                         onAdd = { editingPlan = null; planEditorOpen = true },
                         onEdit = { editingPlan = it; planEditorOpen = true },
@@ -328,7 +353,17 @@ private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, con
             Spacer(Modifier.height(8.dp))
         }
         if (state.isLoading) {
-            item(key = "loading") { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            item(key = "loading") {
+                SkeletonScope {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        repeat(3) { Bone(Modifier.weight(1f).height(64.dp), RoundedCornerShape(20.dp)) }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    SkeletonChart(bars = 5)
+                    Spacer(Modifier.height(10.dp))
+                    SkeletonCardList(rows = 4)
+                }
+            }
             return@LazyColumn
         }
         if (state.statements.isEmpty()) {

@@ -77,12 +77,14 @@ class PayInstallmentAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         // Sin conexión no cambia nada: el botón sigue en "Pagar", así se nota que no se registró.
         runCatching { installmentsEntryPoint(context).installments().pay(parameters[planIdKey] ?: return) }
+        com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }
 }
 
 class UndoInstallmentAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         runCatching { installmentsEntryPoint(context).installments().undoLast(parameters[planIdKey] ?: return) }
+        com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }
 }
 

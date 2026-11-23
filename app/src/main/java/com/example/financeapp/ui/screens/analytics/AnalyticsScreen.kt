@@ -91,7 +91,11 @@ fun AnalyticsScreen(
         }
 
         if (state.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                com.example.financeapp.ui.components.SkeletonHero(height = 220.dp)
+                Spacer(Modifier.height(14.dp))
+                com.example.financeapp.ui.components.SkeletonCardList(rows = 5)
+            }
             return@Column
         }
 

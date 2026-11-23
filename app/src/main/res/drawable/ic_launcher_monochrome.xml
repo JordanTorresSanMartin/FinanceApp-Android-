@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Capa para íconos temáticos (Android 13+): el sistema la tiñe con el color del fondo de pantalla. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M44,37 L44,71 M44,37 L67,37 M44,54 L59,54"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M67,67 m-5.5,0 a5.5,5.5 0,1 1,11 0 a5.5,5.5 0,1 1,-11 0"
+        android:fillColor="#FFFFFF" />
+</vector>

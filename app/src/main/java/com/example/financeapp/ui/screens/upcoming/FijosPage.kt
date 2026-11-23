@@ -1,5 +1,8 @@
 package com.example.financeapp.ui.screens.upcoming
 
+import com.example.financeapp.ui.components.SkeletonCardList
+import com.example.financeapp.ui.components.SkeletonScope
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -51,6 +54,9 @@ internal fun FijosPage(
         item(key = "intro") {
             PageIntro("Suscripciones y cuentas que se repiten cada mes o año.") { AddPill(onAdd) }
             Spacer(Modifier.height(8.dp))
+        }
+        if (state.items.isEmpty() && state.isLoading) {
+            item(key = "skeleton") { SkeletonScope { SkeletonCardList(rows = 3) } }
         }
         if (state.items.isEmpty() && !state.isLoading) {
             item(key = "empty") {

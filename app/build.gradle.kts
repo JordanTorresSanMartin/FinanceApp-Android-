@@ -9,15 +9,13 @@ plugins {
 android {
     namespace = "com.example.financeapp"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37) // Android 17
     }
 
     defaultConfig {
         applicationId = "com.example.financeapp"
         minSdk = 26 // java.time sin desugaring
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
@@ -82,6 +80,9 @@ dependencies {
     // Glance
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+    implementation(libs.androidx.work.runtime.ktx)
+    // Instala los perfiles de compilación anticipada (Compose y la app): arranque y scroll más fluidos.
+    implementation(libs.androidx.profileinstaller)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -116,7 +116,9 @@ fun BudgetsScreen(
         }
 
         if (state.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                com.example.financeapp.ui.components.SkeletonCardList(rows = 6)
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().imePadding(),

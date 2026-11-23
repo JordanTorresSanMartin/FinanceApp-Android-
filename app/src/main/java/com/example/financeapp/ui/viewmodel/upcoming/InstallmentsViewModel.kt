@@ -19,7 +19,11 @@ class InstallmentsViewModel @Inject constructor(private val store: InstallmentSt
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    init { run("No se pudieron actualizar tus cuotas.") { store.refresh() } }
+    /** true hasta la primera lectura del servidor (si ya hay caché, la pantalla no muestra esqueleto). */
+    private val _loading = MutableStateFlow(true)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
+    init { run("No se pudieron actualizar tus cuotas.") { try { store.refresh() } finally { _loading.value = false } } }
 
     fun save(plan: InstallmentPlan) = run("No se pudo guardar.") { store.upsert(plan) }
     fun delete(id: String) = run("No se pudo eliminar.") { store.delete(id) }

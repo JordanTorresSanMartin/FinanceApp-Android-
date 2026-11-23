@@ -179,12 +179,14 @@ private val rowIdKey = ActionParameters.Key<String>("recurring_id")
 class MarkPaidAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         fixedEntryPoint(context).fixedPayments().pay(parameters[rowIdKey] ?: return)
+        com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }
 }
 
 class UndoPaidAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         fixedEntryPoint(context).fixedPayments().undo(parameters[rowIdKey] ?: return)
+        com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }
 }
 

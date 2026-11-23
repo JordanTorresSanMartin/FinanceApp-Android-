@@ -30,3 +30,7 @@
 # Rutas de navegación type-safe (@Serializable)
 -keep class com.example.financeapp.ui.navigation.NavRoute** { *; }
 -dontwarn org.slf4j.**
+
+# WorkManager (aviso en vivo de pagos): Room crea WorkDatabase_Impl por reflexión.
+# Sin esto, R8 borra su constructor y la app se cae al abrir en release.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }

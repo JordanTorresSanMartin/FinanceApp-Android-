@@ -1,5 +1,9 @@
 package com.example.financeapp.ui.screens.dashboard
 
+import com.example.financeapp.ui.components.Bone
+import com.example.financeapp.ui.components.SkeletonCardList
+import com.example.financeapp.ui.components.SkeletonScope
+
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.BasicText
@@ -197,8 +201,10 @@ private fun DashboardBody(
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                 )
                 // autoSize: montos de 8+ dígitos se achican en vez de cortarse.
-                BasicText(
-                    if (state.isLoading) "—" else formatMoneyCLP(cumulative),
+                if (state.isLoading) SkeletonScope {
+                    Bone(Modifier.padding(vertical = 6.dp).width(220.dp).height(44.dp), RoundedCornerShape(12.dp), MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f))
+                } else BasicText(
+                    formatMoneyCLP(cumulative),
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontWeight = FontWeight.Black,
                         color = if (cumulative < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
@@ -220,9 +226,8 @@ private fun DashboardBody(
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text(
-                        if (state.isLoading) "—"
-                        else "Este mes ${if (monthNet >= 0) "+" else "-"}${formatMoneyCLP(abs(monthNet))} · ${"%.1f".format(savings)}% ahorro",
+                    if (state.isLoading) SkeletonScope { Bone(Modifier.width(170.dp).height(12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f)) } else Text(
+                        "Este mes ${if (monthNet >= 0) "+" else "-"}${formatMoneyCLP(abs(monthNet))} · ${"%.1f".format(savings)}% ahorro",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -254,7 +259,7 @@ private fun DashboardBody(
                 TonalAmountCard(
                     modifier = Modifier.weight(1f),
                     label = "Ingresos",
-                    amount = if (state.isLoading) "—" else formatMoneyCLP(income),
+                    amount = if (state.isLoading) null else formatMoneyCLP(income),
                     container = finance.incomeContainer,
                     onContainer = finance.onIncomeContainer,
                     iconBg = finance.income,
@@ -264,7 +269,7 @@ private fun DashboardBody(
                 TonalAmountCard(
                     modifier = Modifier.weight(1f),
                     label = "Gastos",
-                    amount = if (state.isLoading) "—" else formatMoneyCLP(expenses),
+                    amount = if (state.isLoading) null else formatMoneyCLP(expenses),
                     container = finance.expenseContainer,
                     onContainer = finance.onExpenseContainer,
                     iconBg = finance.expense,
@@ -330,9 +335,7 @@ private fun DashboardBody(
 
         if (state.isLoading) {
             item {
-                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                SkeletonScope(Modifier.padding(horizontal = 20.dp)) { SkeletonCardList(rows = 4) }
             }
         } else if (state.budgetStatus.isEmpty()) {
             item { EmptyBudget() }
@@ -348,7 +351,7 @@ private fun DashboardBody(
 private fun TonalAmountCard(
     modifier: Modifier,
     label: String,
-    amount: String,
+    amount: String?, // null = cargando
     container: Color,
     onContainer: Color,
     iconBg: Color,
@@ -372,7 +375,8 @@ private fun TonalAmountCard(
             Text(label, style = MaterialTheme.typography.labelLarge, color = onContainer)
         }
         Spacer(Modifier.height(12.dp))
-        Text(amount, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = onContainer)
+        if (amount == null) SkeletonScope { Bone(Modifier.padding(vertical = 4.dp).width(110.dp).height(24.dp), color = onContainer.copy(alpha = 0.16f)) }
+        else Text(amount, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = onContainer)
     }
 }
 
