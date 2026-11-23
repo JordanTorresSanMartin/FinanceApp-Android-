@@ -78,7 +78,28 @@ import com.example.financeapp.util.formatK
 import com.example.financeapp.util.formatMoneyCLP
 import com.example.financeapp.util.parseHexColor
 import com.example.financeapp.util.shortDateLabel
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
+import com.example.financeapp.domain.CuotaState
+import com.example.financeapp.domain.PayState
+import com.example.financeapp.domain.status
+import com.example.financeapp.ui.viewmodel.upcoming.UpcomingUiState
 
+private enum class UpcomingTab(val title: String) { CUOTAS("Cuotas"), FIJOS("Fijos"), TARJETAS("Tarjetas") }
+
+/**
+ * Próximos pagos: un resumen de lo que falta este mes y tres pestañas deslizables
+ * (Cuotas · Fijos · Tarjetas), cada una con una línea que explica qué contiene.
+ */
 @Composable
 fun UpcomingScreen(
     onBack: () -> Unit,
@@ -96,6 +117,8 @@ fun UpcomingScreen(
     val snackbar = remember { SnackbarHostState() }
     var editorOpen by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<RecurringPayment?>(null) }
+    val tabs = UpcomingTab.entries
+    val pager = rememberPagerState { tabs.size }
 
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -114,143 +137,109 @@ fun UpcomingScreen(
     val cuotasMsg by cuotasVm.message.collectAsStateWithLifecycle()
     LaunchedEffect(cuotasMsg) { cuotasMsg?.let { snackbar.showSnackbar(it); cuotasVm.consumeMessage() } }
 
+    val today = remember { java.time.LocalDate.now() }
+    val pendingPlans = plans.filter { !it.isDone && it.status(today).state != CuotaState.PAGADA_MES }
+    val activePlans = plans.count { !it.isDone }
+    val pendingFijos = recurring.items.filter { it.status.state != PayState.PAGADO }
+    val totalItems = activePlans + recurring.items.size
+    val doneItems = totalItems - pendingPlans.size - pendingFijos.size
+    val pendingCuotasAmount = pendingPlans.sumOf { it.amount }.toDouble()
+    val counts = mapOf(
+        UpcomingTab.CUOTAS to activePlans,
+        UpcomingTab.FIJOS to recurring.items.size,
+        UpcomingTab.TARJETAS to state.installments.size,
+    )
+    val pageInsets = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 32.dp)
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background)) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, "Volver", size = 40.dp)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("COMPROMISOS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Próximos pagos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                }
-                Box(
-                    modifier = Modifier.size(48.dp).clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(enabled = !state.uploading, role = Role.Button, onClickLabel = "Subir estado de cuenta") { pickPdf() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (state.uploading) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    } else {
-                        Icon(Icons.Filled.CloudUpload, "Subir PDF", tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                }
+                Spacer(Modifier.width(16.dp))
+                Text("Próximos pagos", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
-            if (state.isLoading && recurring.isLoading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            } else {
-                val finance = FinanceTheme.colors
-                val maxForecast = (state.forecast.maxOfOrNull { it.amount } ?: 1.0).coerceAtLeast(1.0)
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().navigationBarsPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    // ── Cuotas (locales) ──
-                    item {
-                        InstallmentSection(
-                            plans = plans,
-                            onAdd = { editingPlan = null; planEditorOpen = true },
-                            onEdit = { editingPlan = it; planEditorOpen = true },
-                            onPay = { plan ->
-                                haptics?.success()
-                                cuotasVm.pay(plan.id)
-                                val n = plan.paid + 1
-                                val msg = if (n >= plan.total) "¡Terminaste de pagar ${plan.name}!"
-                                else "Cuota $n de ${plan.total} de ${plan.name} pagada"
-                                scope.launch {
-                                    snackbar.currentSnackbarData?.dismiss()
-                                    val r = snackbar.showSnackbar(msg, actionLabel = "Deshacer", duration = SnackbarDuration.Short)
-                                    if (r == SnackbarResult.ActionPerformed) cuotasVm.undo(plan.id)
-                                }
-                            },
-                        )
-                    }
+            MonthOverview(
+                pending = pendingCuotasAmount + recurring.pendingAmount,
+                cuotas = pendingCuotasAmount,
+                fijos = recurring.pendingAmount,
+                done = doneItems,
+                total = totalItems,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
 
-                    // ── Suscripciones y pagos fijos ──
-                    item {
-                        RecurringSection(
-                            state = recurring,
-                            onAdd = { editingItem = null; editorOpen = true },
-                            onEdit = { editingItem = it; editorOpen = true },
-                            onRegister = { recurringVm.registerPayment(it) },
-                        )
-                    }
-
-                    // ── Estados de cuenta / cuotas ──
-                    if (state.statements.isEmpty()) {
-                        item { UploadPromptCard(uploading = state.uploading, onUpload = pickPdf) }
-                    } else {
-                        item {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer).padding(24.dp),
-                            ) {
-                                Text("Cuota mensual comprometida", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f))
-                                Text(formatMoneyCLP(state.monthlyTotal), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                Spacer(Modifier.height(8.dp))
-                                Box(modifier = Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                                    Text("${state.installments.size} compras en cuotas activas", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                }
-                            }
-                        }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(finance.expenseContainer).padding(16.dp)) {
-                                    Text("FACTURADO ESTE MES", style = MaterialTheme.typography.labelMedium, color = finance.onExpenseContainer)
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(formatMoneyCLP(state.billedTotal), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = finance.onExpenseContainer)
-                                }
-                                Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(16.dp)) {
-                                    Text("PRÓXIMO VENCIMIENTO", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(state.nextDue?.let { shortDateLabel(it) } ?: "—", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                        if (state.forecast.isNotEmpty()) {
-                            item {
-                                Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(20.dp)) {
-                                    Text("Vencimiento próximos meses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                    Spacer(Modifier.height(18.dp))
-                                    Row(modifier = Modifier.fillMaxWidth().height(130.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                                        state.forecast.forEach { f ->
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                                Text(formatK(f.amount), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Spacer(Modifier.height(6.dp))
-                                                Box(modifier = Modifier.width(26.dp).height((6 + (f.amount / maxForecast * 90)).dp).clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).background(MaterialTheme.colorScheme.primary))
-                                                Spacer(Modifier.height(8.dp))
-                                                Text(monthAbbrev(f.month), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                        }
+            Spacer(Modifier.height(8.dp))
+            PrimaryTabRow(
+                selectedTabIndex = pager.currentPage,
+                containerColor = MaterialTheme.colorScheme.background,
+                divider = {},
+            ) {
+                tabs.forEachIndexed { i, tab ->
+                    val selected = pager.currentPage == i
+                    Tab(
+                        selected = selected,
+                        onClick = { haptics?.selection(); scope.launch { pager.animateScrollToPage(i) } },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(tab.title, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                                val n = counts[tab] ?: 0
+                                if (n > 0) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Box(
+                                        Modifier.clip(CircleShape).background(
+                                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest
+                                        ).padding(horizontal = 7.dp, vertical = 1.dp),
+                                    ) {
+                                        Text(
+                                            "$n", style = MaterialTheme.typography.labelSmall,
+                                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
                                 }
                             }
-                        }
-                        item {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text("Compras en cuotas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                Text("${state.installments.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        },
+                    )
+                }
+            }
+
+            HorizontalPager(
+                state = pager,
+                modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+                beyondViewportPageCount = 1,
+            ) { page ->
+                when (tabs[page]) {
+                    UpcomingTab.CUOTAS -> CuotasPage(
+                        plans = plans,
+                        contentPadding = pageInsets,
+                        onAdd = { editingPlan = null; planEditorOpen = true },
+                        onEdit = { editingPlan = it; planEditorOpen = true },
+                        onPay = { plan ->
+                            haptics?.success()
+                            cuotasVm.pay(plan.id)
+                            val n = plan.paid + 1
+                            val msg = if (n >= plan.total) "¡Terminaste de pagar ${plan.name}!"
+                            else "Cuota $n de ${plan.total} de ${plan.name} pagada"
+                            scope.launch {
+                                snackbar.currentSnackbarData?.dismiss()
+                                val r = snackbar.showSnackbar(msg, actionLabel = "Deshacer", duration = SnackbarDuration.Short)
+                                if (r == SnackbarResult.ActionPerformed) cuotasVm.undo(plan.id)
                             }
-                        }
-                        items(state.installments, key = { it.id }) { InstallmentCard(it) }
-                        item {
-                            Text(
-                                state.statements.joinToString("  ·  ") { (it.bank ?: "Banco") + (it.cardLast4?.let { l -> " ••$l" } ?: "") },
-                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            )
-                        }
-                    }
+                        },
+                    )
+                    UpcomingTab.FIJOS -> FijosPage(
+                        state = recurring,
+                        contentPadding = pageInsets,
+                        onAdd = { editingItem = null; editorOpen = true },
+                        onEdit = { editingItem = it; editorOpen = true },
+                        onRegister = { haptics?.success(); recurringVm.registerPayment(it) },
+                    )
+                    UpcomingTab.TARJETAS -> TarjetasPage(state, today, pageInsets, onUpload = pickPdf)
                 }
             }
         }
@@ -287,65 +276,176 @@ fun UpcomingScreen(
     }
 }
 
+/** Lo único que importa de un vistazo: cuánto falta pagar este mes y cuánto llevas. */
 @Composable
-private fun UploadPromptCard(uploading: Boolean, onUpload: () -> Unit) {
+private fun MonthOverview(pending: Double, cuotas: Double, fijos: Double, done: Int, total: Int, modifier: Modifier = Modifier) {
+    val onC = MaterialTheme.colorScheme.onPrimaryContainer
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))
+            .padding(horizontal = 20.dp, vertical = 18.dp),
     ) {
-        Icon(Icons.Filled.CloudUpload, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(40.dp))
-        Text("Sube tu estado de cuenta", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
-            "Importa el PDF de tu tarjeta y detectamos tus compras en cuotas. Si tiene contraseña, te la pedimos.",
-            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
+            if (pending > 0) "Te falta pagar este mes" else "Este mes",
+            style = MaterialTheme.typography.labelLarge, color = onC.copy(alpha = 0.85f),
         )
+        if (pending > 0) {
+            AnimatedMoney(pending, MaterialTheme.typography.headlineLarge, onC)
+        } else {
+            Text("Todo al día ✓", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black, color = onC)
+        }
+        if (total > 0) {
+            Spacer(Modifier.height(10.dp))
+            ThinProgress(done.toFloat() / total, onC)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                buildString {
+                    append("$done de $total pagos listos")
+                    if (cuotas > 0) append(" · cuotas ${money(cuotas)}")
+                    if (fijos > 0) append(" · fijos ${money(fijos)}")
+                },
+                style = MaterialTheme.typography.labelMedium, color = onC.copy(alpha = 0.85f), maxLines = 2,
+            )
+        }
+    }
+}
+
+/** Pestaña "Tarjetas": lo que detectamos en tus estados de cuenta (solo lectura). */
+@Composable
+private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, contentPadding: PaddingValues, onUpload: () -> Unit) {
+    val finance = FinanceTheme.colors
+    val dueJava = state.nextDue?.let { runCatching { java.time.LocalDate.parse(it.toString()) }.getOrNull() }
+    val stale = dueJava != null && dueJava.isBefore(today.minusDays(7))
+    val source = state.statements.joinToString(" · ") { bankShort(it.bank) + (it.cardLast4?.let { l -> " ••$l" } ?: "") }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        item(key = "intro") {
+            PageIntro(
+                if (state.statements.isEmpty()) "Cuotas que vienen en el estado de cuenta de tu tarjeta."
+                else "Del estado de cuenta: $source. Solo lectura.",
+            ) { if (state.statements.isNotEmpty()) UploadPill(state.uploading, onUpload) }
+            Spacer(Modifier.height(8.dp))
+        }
+        if (state.isLoading) {
+            item(key = "loading") { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            return@LazyColumn
+        }
+        if (state.statements.isEmpty()) {
+            item(key = "empty") {
+                EmptyPage(
+                    Icons.Filled.CloudUpload, "Sube tu estado de cuenta",
+                    "Importa el PDF de tu tarjeta y detectamos tus compras en cuotas. Si tiene contraseña, te la pedimos.",
+                ) { UploadPill(state.uploading, onUpload) }
+            }
+            return@LazyColumn
+        }
+        if (stale) {
+            item(key = "stale") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(20.dp))
+                        .background(finance.warningContainer).padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Estos datos son del estado de cuenta que vencía el ${shortDateLabel(state.nextDue!!)}. " +
+                            "Sube el más reciente para verlos al día.",
+                        style = MaterialTheme.typography.bodyMedium, color = finance.warning, modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+        item(key = "stats") {
+            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatTile("Cuotas al mes", money(state.monthlyTotal), Modifier.weight(1f))
+                StatTile("Facturado", money(state.billedTotal), Modifier.weight(1f))
+                StatTile("Vence", state.nextDue?.let { shortDateLabel(it) } ?: "—", Modifier.weight(1f))
+            }
+        }
+        if (state.forecast.isNotEmpty()) {
+            item(key = "forecast") { ForecastChart(state, Modifier.padding(bottom = 16.dp)) }
+        }
+        item(key = "list-title") {
+            Text(
+                "${state.installments.size} compras en cuotas", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+            )
+        }
+        itemsIndexed(state.installments, key = { _, it -> it.id }) { i, inst ->
+            BankInstallmentRow(inst, i, state.installments.size, Modifier.animateItem())
+        }
+    }
+}
+
+@Composable
+private fun UploadPill(uploading: Boolean, onUpload: () -> Unit) {
+    FilledTonalButton(onClick = onUpload, enabled = !uploading, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
+        if (uploading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+        else Icon(Icons.Filled.CloudUpload, null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(if (uploading) "Leyendo…" else "Subir PDF", fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Spacer(Modifier.height(2.dp))
+        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ForecastChart(state: UpcomingUiState, modifier: Modifier = Modifier) {
+    val maxForecast = (state.forecast.maxOfOrNull { it.amount } ?: 1.0).coerceAtLeast(1.0)
+    Column(
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow).padding(20.dp),
+    ) {
+        Text("Cuotas por vencer, mes a mes", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(16.dp))
         Row(
-            modifier = Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable(enabled = !uploading) { onUpload() }.padding(horizontal = 24.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().height(120.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom,
         ) {
-            if (uploading) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-            } else {
-                Icon(Icons.Filled.CloudUpload, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Subir PDF", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+            state.forecast.forEach { f ->
+                // Las barras crecen desde abajo al aparecer.
+                val h by animateFloatAsState((f.amount / maxForecast).toFloat(), spring(stiffness = Spring.StiffnessLow), label = "bar")
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(formatK(f.amount), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp))
+                    Box(
+                        Modifier.width(24.dp).height((6 + h * 62).dp) // deja espacio a montos y meses
+                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).background(MaterialTheme.colorScheme.primary),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(monthAbbrev(f.month), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun InstallmentCard(it: Installment) {
+private fun BankInstallmentRow(it: Installment, index: Int, count: Int, modifier: Modifier) {
     val color = parseHexColor(it.categories?.color, MaterialTheme.colorScheme.primary)
     val remaining = it.installmentTotal - it.installmentCurrent
-    val pct = if (it.installmentTotal > 0) it.installmentCurrent.toDouble() / it.installmentTotal else 0.0
-    val cardTag = bankShort(it.statements?.bank) + (it.statements?.cardLast4?.let { l -> " ••$l" } ?: "")
-    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CategoryAvatar(icon = categoryIcon(it.categories?.icon), color = color, size = 42.dp, corner = 14.dp)
-            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(it.description, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text(
-                    "$cardTag · ${it.categories?.name ?: "Otros"} · Total ${formatMoneyCLP(it.totalAmount)}",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(formatMoneyCLP(it.monthlyAmount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("al mes", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AnimatedProgressBar(pct = pct * 100, color = color, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(12.dp))
-            Box(modifier = Modifier.clip(CircleShape).background(color.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                Text(
-                    "$remaining ${if (remaining == 1) "cuota" else "cuotas"} · ${it.installmentCurrent}/${it.installmentTotal}",
-                    style = MaterialTheme.typography.labelMedium, color = color,
-                )
-            }
+    val card = bankShort(it.statements?.bank) + (it.statements?.cardLast4?.let { l -> " ••$l" } ?: "")
+    GroupRow(index, count, modifier) {
+        CategoryAvatar(icon = categoryIcon(it.categories?.icon), color = color, size = 40.dp, corner = 14.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            RowTitle(it.description, "${money(it.monthlyAmount)}/mes")
+            Text(
+                "$card · cuota ${it.installmentCurrent} de ${it.installmentTotal} · quedan $remaining",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            )
+            Spacer(Modifier.height(6.dp))
+            ThinProgress(if (it.installmentTotal > 0) it.installmentCurrent.toFloat() / it.installmentTotal else 0f, color)
         }
     }
 }

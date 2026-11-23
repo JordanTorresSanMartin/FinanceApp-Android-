@@ -20,6 +20,8 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.items
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
@@ -28,6 +30,7 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -83,8 +86,8 @@ internal fun avatarColor(name: String, hex: String? = null): Color =
         ?: Color(avatarPalette[Math.floorMod(name.lowercase().hashCode(), avatarPalette.size)])
 
 /**
- * Medidas del widget. Cómodo por defecto; si así no caben al menos 2 filas enteras
- * (launchers con celdas bajas, p. ej. OxygenOS en 4×2) pasa a compacto.
+ * Medidas del widget. Cómodo si caben todas las filas; si no, compacto para mostrar más
+ * (el resto se alcanza deslizando la lista, ver [WidgetList]).
  */
 internal data class Dims(
     val compact: Boolean,
@@ -102,18 +105,102 @@ internal data class Dims(
 
 internal fun dimsFor(height: Dp, items: Int, comfortRow: Dp, compactRow: Dp): Dims {
     val comfort = Dims(false, 10.dp, 46.dp, 6.dp, comfortRow, 36.dp, 40.dp, 15.sp, 20.sp)
-    if (comfort.rowsFit(height) >= minOf(items, 2)) return comfort
+    if (comfort.rowsFit(height) >= items) return comfort
     return Dims(true, 8.dp, 30.dp, 4.dp, compactRow, 28.dp, 32.dp, 14.sp, 16.sp)
 }
 
+// Alto mínimo de una tarjeta; las filas de la cuadrícula se reparten el alto real (algunos
+// launchers informan un LocalSize algo menor al dibujado, así no queda espacio vacío).
+private val TILE_MIN = 48.dp
+
 /**
- * Elige qué filas mostrar si no caben todas: las más urgentes (lo pagado hoy cuenta como urgente
- * para que "Deshacer" no desaparezca), y las muestra en su orden natural (estable).
+ * Cuántas tarjetas caben en cuadrícula de 2 columnas, o 0 si conviene la lista
+ * (caben todas como filas, o el widget es angosto). La cuadrícula existe porque en pilas de
+ * widgets (OxygenOS, Pixel) el deslizamiento vertical cambia de widget y la lista no se puede mover.
  */
+internal fun gridCapacity(width: Dp, height: Dp, d: Dims, items: Int): Int {
+    if (d.rowsFit(height) >= items || width < 280.dp) return 0
+    val rows = ((height - d.pad * 2 - d.headerH + d.gap) / (TILE_MIN + d.gap)).toInt().coerceAtLeast(1)
+    return rows * 2
+}
+
+/** Si no caben todas, deja las más urgentes (menor rango) sin alterar su orden. */
 internal fun <T> pickVisible(items: List<T>, max: Int, rank: (T) -> Int): List<T> {
     if (items.size <= max) return items
     val keep = items.withIndex().sortedBy { rank(it.value) }.take(max).map { it.index }.toSet()
     return items.filterIndexed { i, _ -> i in keep }
+}
+
+@Composable
+internal fun <T> ColumnScope.WidgetGrid(d: Dims, items: List<T>, tile: @Composable (T, GlanceModifier) -> Unit) {
+    items.chunked(2).forEach { pair ->
+        Spacer(GlanceModifier.height(d.gap))
+        Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+            tile(pair[0], GlanceModifier.defaultWeight().fillMaxHeight())
+            Spacer(GlanceModifier.width(d.gap))
+            if (pair.size > 1) tile(pair[1], GlanceModifier.defaultWeight().fillMaxHeight()) else Spacer(GlanceModifier.defaultWeight())
+        }
+    }
+}
+
+/** Tarjeta compacta para la cuadrícula: nombre + estado, y botón redondo a la derecha. */
+@Composable
+internal fun ItemTile(modifier: GlanceModifier, name: String, top: String?, status: String, tone: Tone, kind: PillKind, label: String, action: Action?) {
+    Row(
+        modifier = modifier
+            .cornerRadius(android.R.dimen.system_app_widget_inner_radius)
+            .background(toneBg(tone))
+            .padding(start = 10.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(name, maxLines = 1, modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = GlanceTheme.colors.onSurface))
+                if (top != null) {
+                    Spacer(GlanceModifier.width(6.dp))
+                    Text(top, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GlanceTheme.colors.primary))
+                }
+            }
+            Text(status, maxLines = 1, style = TextStyle(
+                fontSize = 11.sp, color = toneText(tone),
+                fontWeight = if (tone == Tone.LATE) FontWeight.Bold else FontWeight.Medium,
+            ))
+        }
+        Spacer(GlanceModifier.width(6.dp))
+        RoundAction(kind, label, action)
+    }
+}
+
+/** Botón redondo solo ícono (Pagar ✓ / Deshacer ↶ / Pagada ✓ no tocable). */
+@Composable
+private fun RoundAction(kind: PillKind, label: String, action: Action?) {
+    val (bg, fg, icon) = when (kind) {
+        PillKind.PAY -> Triple(GlanceTheme.colors.primary, GlanceTheme.colors.onPrimary, R.drawable.ic_widget_check)
+        PillKind.UNDO -> Triple(GlanceTheme.colors.secondaryContainer, GlanceTheme.colors.onSecondaryContainer, R.drawable.ic_widget_undo)
+        PillKind.DONE -> Triple(okBg, okText, R.drawable.ic_widget_check)
+    }
+    var mod = GlanceModifier.size(36.dp).cornerRadius(18.dp).background(bg)
+    if (action != null) mod = mod.clickable(action)
+    Box(modifier = mod.semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
+        Image(ImageProvider(icon), null, colorFilter = ColorFilter.tint(fg), modifier = GlanceModifier.size(18.dp))
+    }
+}
+
+/**
+ * Lista deslizable bajo el encabezado, para widgets angostos y altos fuera de una pila
+ * (la fila a medias al borde indica que hay más).
+ */
+@Composable
+internal fun <T> ColumnScope.WidgetList(d: Dims, items: List<T>, id: (T) -> String, row: @Composable (T) -> Unit) {
+    LazyColumn(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+        items(items, itemId = { id(it).hashCode().toLong() }) { item ->
+            Column(modifier = GlanceModifier.fillMaxWidth()) {
+                Spacer(GlanceModifier.height(d.gap))
+                row(item)
+            }
+        }
+    }
 }
 
 internal fun openUpcomingIntent(context: Context) =

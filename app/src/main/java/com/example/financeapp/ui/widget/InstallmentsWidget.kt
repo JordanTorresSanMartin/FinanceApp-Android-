@@ -111,41 +111,58 @@ private fun InstallmentsContent(plans: List<InstallmentPlan>, today: LocalDate) 
                 "Pagaste todo. Bien hecho", positive = true,
             )
             else -> {
-                val max = d.rowsFit(LocalSize.current.height)
-                val visible = pickVisible(active, max) { if (it.paidToday(today)) -1 else it.status(today).state.ordinal }
-                val hidden = active.size - visible.size
                 val paidMonth = active.count { it.status(today).state == CuotaState.PAGADA_MES }
+                val size = LocalSize.current
+                val cap = gridCapacity(size.width, size.height, d, active.size)
+                val more = if (cap in 1 until active.size) " · +${active.size - cap}" else ""
                 WidgetHeader(
                     d = d,
-                    title = "Mis cuotas · $paidMonth/${active.size} este mes" + if (hidden > 0) " · +$hidden más" else "",
-                    shortTitle = "$paidMonth/${active.size} este mes" + if (hidden > 0) " · +$hidden" else "",
+                    title = "Mis cuotas · $paidMonth/${active.size} este mes$more",
+                    shortTitle = "$paidMonth/${active.size} este mes$more",
                     value = "Quedan ${formatMoneyCLP(active.sumOf { it.remainingAmount }.toDouble())}",
                     open = open,
                     button = R.drawable.ic_widget_add,
                     buttonLabel = "Abrir la app para agregar o editar cuotas",
                     buttonAction = open,
                 )
-                visible.forEach { plan ->
-                    Spacer(GlanceModifier.height(d.gap))
-                    PlanCard(d, plan, today)
+                if (cap == 0) {
+                    WidgetList(d, active, id = { it.id }) { plan -> PlanCard(d, plan, today) }
+                } else {
+                    // Lo pagado hoy cuenta como urgente para que "Deshacer" no desaparezca.
+                    val shown = pickVisible(active, cap) { if (it.paidToday(today)) -1 else it.status(today).state.ordinal }
+                    WidgetGrid(d, shown) { plan, mod ->
+                        val (kind, label, action) = planAction(plan, today)
+                        ItemTile(mod, plan.name, "${plan.paid}/${plan.total}", plan.status(today).label, toneOf(plan, today), kind, label, action)
+                    }
                 }
             }
         }
     }
 }
 
+private fun toneOf(plan: InstallmentPlan, today: LocalDate) = when (plan.status(today).state) {
+    CuotaState.ATRASADA -> Tone.LATE
+    CuotaState.POR_VENCER -> Tone.SOON
+    CuotaState.PAGADA_MES, CuotaState.TERMINADA -> Tone.OK
+    CuotaState.PENDIENTE -> Tone.NORMAL
+}
+
+private fun planAction(plan: InstallmentPlan, today: LocalDate): Triple<PillKind, String, androidx.glance.action.Action?> {
+    val params = actionParametersOf(planIdKey to plan.id)
+    return when {
+        plan.paidToday(today) -> Triple(PillKind.UNDO, "Deshacer pago de ${plan.name}", actionRunCallback<UndoInstallmentAction>(params))
+        plan.status(today).state == CuotaState.PAGADA_MES -> Triple(PillKind.DONE, "Cuota del mes de ${plan.name} pagada", null)
+        else -> Triple(PillKind.PAY, "Pagar cuota ${plan.paid + 1} de ${plan.total} de ${plan.name}", actionRunCallback<PayInstallmentAction>(params))
+    }
+}
+
 @Composable
 private fun PlanCard(d: Dims, plan: InstallmentPlan, today: LocalDate) {
     val st = plan.status(today)
-    val tone = when (st.state) {
-        CuotaState.ATRASADA -> Tone.LATE
-        CuotaState.POR_VENCER -> Tone.SOON
-        CuotaState.PAGADA_MES, CuotaState.TERMINADA -> Tone.OK
-        CuotaState.PENDIENTE -> Tone.NORMAL
-    }
-    val params = actionParametersOf(planIdKey to plan.id)
+    val tone = toneOf(plan, today)
     val status = if (st.state == CuotaState.PAGADA_MES) "Quedan ${plan.remaining} · ${formatMoneyCLP(plan.remainingAmount.toDouble())}"
     else "${st.label} · ${formatMoneyCLP(plan.amount.toDouble())}"
+    val (kind, label, action) = planAction(plan, today)
     ItemCard(
         d = d,
         name = plan.name,
@@ -161,12 +178,6 @@ private fun PlanCard(d: Dims, plan: InstallmentPlan, today: LocalDate) {
                 backgroundColor = GlanceTheme.colors.surfaceVariant,
             )
         },
-        pill = {
-            when {
-                plan.paidToday(today) -> ActionPill(d, PillKind.UNDO, "Deshacer pago de ${plan.name}", actionRunCallback<UndoInstallmentAction>(params))
-                st.state == CuotaState.PAGADA_MES -> ActionPill(d, PillKind.DONE, "Cuota del mes de ${plan.name} pagada", null)
-                else -> ActionPill(d, PillKind.PAY, "Pagar cuota ${plan.paid + 1} de ${plan.total} de ${plan.name}", actionRunCallback<PayInstallmentAction>(params))
-            }
-        },
+        pill = { ActionPill(d, kind, label, action) },
     )
 }

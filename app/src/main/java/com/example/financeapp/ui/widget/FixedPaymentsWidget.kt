@@ -212,52 +212,61 @@ private fun FixedContent(snap: FixedSnapshot, today: LocalDate) {
             rows.isEmpty() -> FriendlyMessage(context, R.drawable.ic_widget_add, "Agrega tus pagos fijos", "Netflix, plan del celular, internet…", positive = false)
             else -> {
                 val pending = rows.filter { it.state != PayState.PAGADO }
-                val max = d.rowsFit(LocalSize.current.height)
-                val visible = pickVisible(rows, max) { if (it.paidOn == today.toString()) -1 else it.state.ordinal }
-                val hidden = rows.size - visible.size
                 val paid = rows.size - pending.size
+                val size = LocalSize.current
+                val cap = gridCapacity(size.width, size.height, d, rows.size)
+                val more = if (cap in 1 until rows.size) " · +${rows.size - cap}" else ""
                 WidgetHeader(
                     d = d,
-                    title = "Pagos fijos · $paid/${rows.size} pagados" + (if (hidden > 0) " · +$hidden más" else "") + (if (snap.offline) " · sin conexión" else ""),
-                    shortTitle = "$paid/${rows.size} pagados" + (if (hidden > 0) " · +$hidden" else "") + (if (snap.offline) " · sin red" else ""),
+                    title = "Pagos fijos · $paid/${rows.size} pagados$more" + (if (snap.offline) " · sin conexión" else ""),
+                    shortTitle = "$paid/${rows.size} pagados$more" + (if (snap.offline) " · sin red" else ""),
                     value = if (pending.isEmpty()) "¡Todo al día!" else "Falta ${formatMoneyCLP(pending.sumOf { it.amount })}",
                     open = open,
                     button = R.drawable.ic_widget_refresh,
                     buttonLabel = "Actualizar pagos fijos",
                     buttonAction = actionRunCallback<RefreshAction>(),
                 )
-                visible.forEach { row ->
-                    Spacer(GlanceModifier.height(d.gap))
-                    FixedCard(d, row, today)
+                if (cap == 0) {
+                    WidgetList(d, rows, id = { it.id }) { row -> FixedCard(d, row, today) }
+                } else {
+                    val shown = pickVisible(rows, cap) { if (it.paidOn == today.toString()) -1 else it.state.ordinal }
+                    WidgetGrid(d, shown) { row, mod ->
+                        val (kind, label, action) = fixedAction(row, today)
+                        ItemTile(mod, row.name, null, row.label(today), toneOf(row), kind, label, action)
+                    }
                 }
             }
         }
     }
 }
 
+private fun toneOf(row: FixedRow) = when (row.state) {
+    PayState.ATRASADO -> Tone.LATE
+    PayState.POR_VENCER -> Tone.SOON
+    PayState.PAGADO -> Tone.OK
+    PayState.PENDIENTE -> Tone.NORMAL
+}
+
+private fun fixedAction(row: FixedRow, today: LocalDate): Triple<PillKind, String, androidx.glance.action.Action?> {
+    val params = actionParametersOf(rowIdKey to row.id)
+    return when {
+        row.state == PayState.PAGADO && row.paidOn == today.toString() ->
+            Triple(PillKind.UNDO, "Deshacer pago de ${row.name}", actionRunCallback<UndoPaidAction>(params))
+        row.state == PayState.PAGADO -> Triple(PillKind.DONE, "${row.name} pagado este período", null)
+        else -> Triple(PillKind.PAY, "Pagar ${row.name}", actionRunCallback<MarkPaidAction>(params))
+    }
+}
+
 @Composable
 private fun FixedCard(d: Dims, row: FixedRow, today: LocalDate) {
-    val tone = when (row.state) {
-        PayState.ATRASADO -> Tone.LATE
-        PayState.POR_VENCER -> Tone.SOON
-        PayState.PAGADO -> Tone.OK
-        PayState.PENDIENTE -> Tone.NORMAL
-    }
-    val params = actionParametersOf(rowIdKey to row.id)
+    val (kind, label, action) = fixedAction(row, today)
     ItemCard(
         d = d,
         name = row.name,
         avatar = avatarColor(row.name, row.color),
         trailingTop = formatMoneyCLP(row.amount),
         status = row.label(today),
-        tone = tone,
-        pill = {
-            when {
-                row.state == PayState.PAGADO && row.paidOn == today.toString() ->
-                    ActionPill(d, PillKind.UNDO, "Deshacer pago de ${row.name}", actionRunCallback<UndoPaidAction>(params))
-                row.state == PayState.PAGADO -> ActionPill(d, PillKind.DONE, "${row.name} pagado este período", null, doneText = "Pagado")
-                else -> ActionPill(d, PillKind.PAY, "Pagar ${row.name}", actionRunCallback<MarkPaidAction>(params))
-            }
-        },
+        tone = toneOf(row),
+        pill = { ActionPill(d, kind, label, action, doneText = "Pagado") },
     )
 }
