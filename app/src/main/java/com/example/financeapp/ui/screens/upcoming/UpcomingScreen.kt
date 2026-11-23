@@ -111,6 +111,8 @@ fun UpcomingScreen(
 
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); viewModel.consumeMessage() } }
     LaunchedEffect(recurring.message) { recurring.message?.let { snackbar.showSnackbar(it); recurringVm.consumeMessage() } }
+    val cuotasMsg by cuotasVm.message.collectAsStateWithLifecycle()
+    LaunchedEffect(cuotasMsg) { cuotasMsg?.let { snackbar.showSnackbar(it); cuotasVm.consumeMessage() } }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },

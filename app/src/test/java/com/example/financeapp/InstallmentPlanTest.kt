@@ -2,6 +2,7 @@ package com.example.financeapp
 
 import com.example.financeapp.domain.CuotaState
 import com.example.financeapp.domain.InstallmentPlan
+import com.example.financeapp.domain.paymentDiff
 import com.example.financeapp.domain.status
 import com.example.financeapp.domain.withPaidCount
 import org.junit.Assert.assertEquals
@@ -44,5 +45,17 @@ class InstallmentPlanTest {
         val p = plan(paidBefore = 2, payments = listOf("2026-09-01", "2026-10-01")).withPaidCount(1)
         assertEquals(1, p.paid); assertEquals(listOf("2026-10-01"), p.payments); assertEquals(0, p.paidBefore)
         assertEquals(6, plan(payments = listOf("2026-10-01")).withPaidCount(6).paidBefore + 1)
+    }
+
+    @Test fun paymentDiffSyncsByDate() {
+        val remote = listOf("a" to "2026-09-01", "b" to "2026-10-01", "c" to "2026-10-01")
+        // Sin cambios
+        assertEquals(emptyList<String>() to emptyList<String>(), paymentDiff(remote, listOf("2026-09-01", "2026-10-01", "2026-10-01")))
+        // Bajó "ya pagadas": se borra el más antiguo
+        assertEquals(listOf("a") to emptyList<String>(), paymentDiff(remote, listOf("2026-10-01", "2026-10-01")))
+        // Pago nuevo local
+        assertEquals(emptyList<String>() to listOf("2026-11-05"), paymentDiff(remote.take(1), listOf("2026-09-01", "2026-11-05")))
+        // Todo nuevo
+        assertEquals(emptyList<String>() to listOf("2026-01-01", "2026-02-01"), paymentDiff(emptyList(), listOf("2026-02-01", "2026-01-01")))
     }
 }

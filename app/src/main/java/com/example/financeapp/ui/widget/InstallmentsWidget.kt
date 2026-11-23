@@ -2,6 +2,7 @@ package com.example.financeapp.ui.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
@@ -39,8 +40,8 @@ import dagger.hilt.components.SingletonComponent
 import java.time.LocalDate
 
 /**
- * Widget "Mis cuotas" (datos locales, sin conexión ni sesión): barra de progreso por compra,
- * cuánto queda y botón "Pagar" para la cuota del mes (con "Deshacer").
+ * Widget "Mis cuotas": pinta la caché al instante y la actualiza desde Supabase (incluye pagos
+ * registrados desde la planilla en pareja). Barra de progreso, cuánto queda y "Pagar"/"Deshacer".
  */
 class InstallmentsWidget : GlanceAppWidget() {
     // Exact: LocalSize es el tamaño real, para mostrar solo las filas que caben enteras.
@@ -50,6 +51,7 @@ class InstallmentsWidget : GlanceAppWidget() {
         val store = installmentsEntryPoint(context).installments()
         provideContent {
             val plans by store.plans.collectAsState()
+            LaunchedEffect(Unit) { runCatching { store.refresh() } } // sin conexión: queda la caché
             GlanceTheme { InstallmentsContent(plans, LocalDate.now()) }
         }
     }
@@ -73,13 +75,14 @@ private val planIdKey = ActionParameters.Key<String>("plan_id")
 
 class PayInstallmentAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        installmentsEntryPoint(context).installments().pay(parameters[planIdKey] ?: return)
+        // Sin conexión no cambia nada: el botón sigue en "Pagar", así se nota que no se registró.
+        runCatching { installmentsEntryPoint(context).installments().pay(parameters[planIdKey] ?: return) }
     }
 }
 
 class UndoInstallmentAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        installmentsEntryPoint(context).installments().undoLast(parameters[planIdKey] ?: return)
+        runCatching { installmentsEntryPoint(context).installments().undoLast(parameters[planIdKey] ?: return) }
     }
 }
 

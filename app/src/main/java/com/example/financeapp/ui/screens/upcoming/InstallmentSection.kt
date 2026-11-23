@@ -204,7 +204,7 @@ private fun InstallmentCard(plan: InstallmentPlan, today: LocalDate, onEdit: () 
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(plan.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${money(plan.amount)} por cuota", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${money(plan.amount)} por cuota" + (plan.owedBy?.let { " · te la debe $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Column(
                 horizontalAlignment = Alignment.End,
@@ -279,6 +279,7 @@ fun InstallmentEditorSheet(
     var total by rememberSaveable { mutableStateOf(editing?.total?.toString() ?: "") }
     var paid by rememberSaveable { mutableStateOf(editing?.paid?.takeIf { it > 0 }?.toString() ?: "") }
     var dueDay by rememberSaveable { mutableStateOf(editing?.dueDay?.toString() ?: "") }
+    var owedBy by rememberSaveable { mutableStateOf(editing?.owedBy ?: "") }
     var confirmDelete by remember { mutableStateOf(false) }
 
     val amountV = amount.toLongOrNull() ?: 0L
@@ -312,9 +313,16 @@ fun InstallmentEditorSheet(
             }
             SheetField(
                 dueDay, { dueDay = it.filter(Char::isDigit).take(2) }, "Día de vencimiento (opcional)", KeyboardType.Number,
-                imeAction = ImeAction.Done,
                 error = if (dayError) "Debe ser un día entre 1 y 31" else null,
             )
+            SheetField(owedBy, { owedBy = it.take(40) }, "¿Alguien te la debe? Su nombre (opcional)", imeAction = ImeAction.Done)
+            if (owedBy.isNotBlank()) {
+                Text(
+                    "Escribe el nombre igual que en la planilla en pareja. Cada mes se le cobra la cuota allá " +
+                        "y cuando la pague aparecerá marcada aquí.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             // Vista previa en vivo: el usuario ve el resultado antes de guardar.
             if (amountV > 0 && totalV in 1..360 && !paidError) {
@@ -346,7 +354,10 @@ fun InstallmentEditorSheet(
             Button(
                 onClick = {
                     val base = editing ?: InstallmentPlan(id = UUID.randomUUID().toString(), name = "", amount = 0, total = 1)
-                    onSave(base.copy(name = name.trim(), amount = amountV, total = totalV, dueDay = dayV).withPaidCount(paidV))
+                    onSave(
+                        base.copy(name = name.trim(), amount = amountV, total = totalV, dueDay = dayV,
+                            owedBy = owedBy.trim().ifEmpty { null }).withPaidCount(paidV)
+                    )
                     onDismiss()
                 },
                 enabled = canSave,

@@ -8,8 +8,8 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
- * Compra o deuda en cuotas, guardada solo en el dispositivo.
- * `paid` = cuotas pagadas antes de agregarla a la app + las marcadas desde la app.
+ * Compra o deuda en cuotas, sincronizada con Supabase (tablas installment_plans / installment_payments).
+ * `paid` = cuotas pagadas antes de agregarla a la app + las marcadas desde la app o la planilla.
  */
 @Serializable
 data class InstallmentPlan(
@@ -27,6 +27,8 @@ data class InstallmentPlan(
     val dueDay: Int? = null,
     /** Fecha ISO en que se agregó; evita marcar "atrasada" un mes previo al seguimiento. */
     val createdOn: String = LocalDate.now().toString(),
+    /** Quién te debe estas cuotas (ej. "Fran"). Si está, la planilla en pareja las cobra y registra sus pagos. */
+    val owedBy: String? = null,
 ) {
     val paid: Int get() = (paidBefore + payments.size).coerceAtMost(total)
     val remaining: Int get() = (total - paid).coerceAtLeast(0)
@@ -79,6 +81,21 @@ fun InstallmentPlan.paidToday(today: LocalDate = LocalDate.now()): Boolean = pay
  */
 fun List<InstallmentPlan>.byDueDay(): List<InstallmentPlan> =
     sortedWith(compareBy<InstallmentPlan>({ it.isDone }, { it.dueDay ?: 32 }, { it.name.lowercase() }))
+
+/**
+ * Qué cambiar en el servidor para que sus pagos (id, fecha) queden iguales a [desired] (fechas ISO).
+ * Empareja por fecha; sobrantes se borran (los más antiguos primero, como hace [withPaidCount]).
+ */
+fun paymentDiff(remote: List<Pair<String, String>>, desired: List<String>): Pair<List<String>, List<String>> {
+    val pending = desired.groupingBy { it }.eachCount().toMutableMap()
+    val toDelete = mutableListOf<String>()
+    remote.sortedBy { it.second }.reversed().forEach { (id, date) ->
+        val left = pending[date] ?: 0
+        if (left > 0) pending[date] = left - 1 else toDelete += id
+    }
+    val toInsert = pending.flatMap { (date, n) -> List(n) { date } }.sorted()
+    return toDelete to toInsert
+}
 
 /** Aplica un nuevo "cuotas pagadas" editado a mano, conservando las fechas registradas que quepan. */
 fun InstallmentPlan.withPaidCount(newPaid: Int): InstallmentPlan {
