@@ -88,6 +88,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -100,7 +101,7 @@ fun DashboardScreen(
             )
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
-                onRefresh = { viewModel.load(userRefresh = true) },
+                onRefresh = { haptics?.threshold(); viewModel.load(userRefresh = true) },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 DashboardBody(

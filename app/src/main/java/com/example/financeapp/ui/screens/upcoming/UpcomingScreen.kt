@@ -1,6 +1,8 @@
 package com.example.financeapp.ui.screens.upcoming
 
 import com.example.financeapp.ui.components.Bone
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.drop
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.ui.draw.alpha
 import android.Manifest
@@ -132,6 +134,8 @@ fun UpcomingScreen(
     var editingItem by remember { mutableStateOf<RecurringPayment?>(null) }
     val tabs = UpcomingTab.entries
     val pager = rememberPagerState { tabs.size }
+    // Detent físico: un "tic" cada vez que el deslizamiento cruza a otra pestaña (también al tocar una lejana).
+    LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.drop(1).collect { haptics?.tick() } }
 
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -160,7 +164,7 @@ fun UpcomingScreen(
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); viewModel.consumeMessage() } }
     LaunchedEffect(recurring.message) { recurring.message?.let { snackbar.showSnackbar(it); recurringVm.consumeMessage() } }
     val cuotasMsg by cuotasVm.message.collectAsStateWithLifecycle()
-    LaunchedEffect(cuotasMsg) { cuotasMsg?.let { snackbar.showSnackbar(it); cuotasVm.consumeMessage() } }
+    LaunchedEffect(cuotasMsg) { cuotasMsg?.let { haptics?.error(); snackbar.showSnackbar(it); cuotasVm.consumeMessage() } }
 
     val today = remember { java.time.LocalDate.now() }
     val pendingPlans = plans.filter { !it.isDone && it.status(today).state != CuotaState.PAGADA_MES }
@@ -212,7 +216,7 @@ fun UpcomingScreen(
                     val selected = pager.currentPage == i
                     Tab(
                         selected = selected,
-                        onClick = { haptics?.selection(); scope.launch { pager.animateScrollToPage(i) } },
+                        onClick = { scope.launch { pager.animateScrollToPage(i) } }, // el "tic" lo da el detent de abajo
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(tab.title, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
@@ -249,7 +253,7 @@ fun UpcomingScreen(
                         onAdd = { editingPlan = null; planEditorOpen = true },
                         onEdit = { editingPlan = it; planEditorOpen = true },
                         onPay = { plan ->
-                            haptics?.success()
+                            if (plan.paid + 1 >= plan.total) haptics?.celebrate() else haptics?.success()
                             cuotasVm.pay(plan.id)
                             val n = plan.paid + 1
                             val msg = if (n >= plan.total) "¡Terminaste de pagar ${plan.name}!"
@@ -257,7 +261,7 @@ fun UpcomingScreen(
                             scope.launch {
                                 snackbar.currentSnackbarData?.dismiss()
                                 val r = snackbar.showSnackbar(msg, actionLabel = "Deshacer", duration = SnackbarDuration.Short)
-                                if (r == SnackbarResult.ActionPerformed) cuotasVm.undo(plan.id)
+                                if (r == SnackbarResult.ActionPerformed) { haptics?.undo(); cuotasVm.undo(plan.id) }
                             }
                         },
                     )
@@ -350,6 +354,7 @@ private fun TarjetasPage(
     onSetClosed: (com.example.financeapp.data.model.Statement, Boolean) -> Unit,
 ) {
     val finance = FinanceTheme.colors
+    val haptics = LocalAppHaptics.current
     var confirmClose by remember { mutableStateOf<com.example.financeapp.data.model.Statement?>(null) }
     val perCard = remember(state.installments) { state.installments.groupBy { it.statementId } }
     val dueJava = state.nextDue?.let { runCatching { java.time.LocalDate.parse(it.toString()) }.getOrNull() }
@@ -385,7 +390,7 @@ private fun TarjetasPage(
                     s, i, state.statements.size, Modifier.animateItem(),
                     subtitle = "${list.size} compras · ${money(list.sumOf { it.monthlyAmount })}/mes" +
                         (s.dueDate?.let { " · vence ${shortDateLabel(it)}" } ?: ""),
-                    actionLabel = "Cerrar", onAction = { confirmClose = s },
+                    actionLabel = "Cerrar", onAction = { haptics?.click(); confirmClose = s },
                 )
             }
             item(key = "cards-gap") { Spacer(Modifier.height(16.dp)) }
@@ -444,7 +449,7 @@ private fun TarjetasPage(
                 CardRow(
                     s, i, state.closedCards.size, Modifier.animateItem(),
                     subtitle = "No cuenta en totales ni en la lista", actionLabel = "Reabrir",
-                    dimmed = true, onAction = { onSetClosed(s, false) },
+                    dimmed = true, onAction = { haptics?.click(); onSetClosed(s, false) },
                 )
             }
         }
@@ -456,7 +461,7 @@ private fun TarjetasPage(
             onDismissRequest = { confirmClose = null },
             title = { Text("¿Cerrar ${cardName(s)}?") },
             text = { Text("Sus $n compras en cuotas dejarán de contar en totales, gráfico y lista. No se borra nada: puedes reabrirla cuando quieras.") },
-            confirmButton = { TextButton(onClick = { onSetClosed(s, true); confirmClose = null }) { Text("Cerrar tarjeta") } },
+            confirmButton = { TextButton(onClick = { haptics?.destructive(); onSetClosed(s, true); confirmClose = null }) { Text("Cerrar tarjeta") } },
             dismissButton = { TextButton(onClick = { confirmClose = null }) { Text("Cancelar") } },
         )
     }

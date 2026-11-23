@@ -76,6 +76,7 @@ private val planIdKey = ActionParameters.Key<String>("plan_id")
 class PayInstallmentAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         // Sin conexión no cambia nada: el botón sigue en "Pagar", así se nota que no se registró.
+        com.example.financeapp.util.AppHaptics(context).success()
         runCatching { installmentsEntryPoint(context).installments().pay(parameters[planIdKey] ?: return) }
         com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }
@@ -83,6 +84,7 @@ class PayInstallmentAction : ActionCallback {
 
 class UndoInstallmentAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        com.example.financeapp.util.AppHaptics(context).undo()
         runCatching { installmentsEntryPoint(context).installments().undoLast(parameters[planIdKey] ?: return) }
         com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }

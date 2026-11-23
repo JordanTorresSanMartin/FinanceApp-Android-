@@ -143,7 +143,7 @@ fun EditTransactionScreen(
             title = { Text("Eliminar transacción") },
             text = { Text("¿Seguro que quieres eliminar \"${state.description}\"? Esta acción no se puede deshacer.") },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; viewModel.delete() }) {
+                TextButton(onClick = { haptics?.destructive(); confirmDelete = false; viewModel.delete() }) {
                     Text("Eliminar", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },

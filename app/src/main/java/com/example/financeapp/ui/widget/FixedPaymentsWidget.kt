@@ -178,6 +178,7 @@ private val rowIdKey = ActionParameters.Key<String>("recurring_id")
 
 class MarkPaidAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        com.example.financeapp.util.AppHaptics(context).success()
         fixedEntryPoint(context).fixedPayments().pay(parameters[rowIdKey] ?: return)
         com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }
@@ -185,6 +186,7 @@ class MarkPaidAction : ActionCallback {
 
 class UndoPaidAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        com.example.financeapp.util.AppHaptics(context).undo()
         fixedEntryPoint(context).fixedPayments().undo(parameters[rowIdKey] ?: return)
         com.example.financeapp.notifications.DueAlerts.checkNow(context)
     }

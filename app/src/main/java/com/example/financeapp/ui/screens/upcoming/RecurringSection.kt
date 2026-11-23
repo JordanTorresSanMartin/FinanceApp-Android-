@@ -102,6 +102,7 @@ fun RecurringEditorSheet(
     onDelete: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     var name by rememberSaveable { mutableStateOf(editing?.name ?: "") }
     var amount by rememberSaveable { mutableStateOf(editing?.amount?.toLong()?.toString() ?: "") }
     var frequency by rememberSaveable { mutableStateOf(editing?.frequency ?: Frequency.MENSUAL) }
@@ -169,6 +170,7 @@ fun RecurringEditorSheet(
             Spacer(Modifier.height(4.dp))
             Button(
                 onClick = {
+                    haptics?.success()
                     onSave(editing?.id, name, amountValue.toDouble(), categoryId, frequency,
                         if (frequency == Frequency.MENSUAL) dayValue else null, notes)
                     onDismiss()
@@ -196,7 +198,7 @@ fun RecurringEditorSheet(
             title = { Text("Eliminar pago fijo") },
             text = { Text("¿Eliminar \"${editing.name}\"? Los pagos ya registrados se mantienen en tu historial.") },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete(editing.id); onDismiss() }) {
+                TextButton(onClick = { haptics?.destructive(); confirmDelete = false; onDelete(editing.id); onDismiss() }) {
                     Text("Eliminar", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
@@ -207,11 +209,12 @@ fun RecurringEditorSheet(
 
 @Composable
 private fun ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh
     val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = Modifier.clip(CircleShape).background(bg)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = { haptics?.tick(); onClick() })
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = fg)

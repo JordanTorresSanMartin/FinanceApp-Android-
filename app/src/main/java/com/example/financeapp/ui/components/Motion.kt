@@ -100,6 +100,8 @@ fun Modifier.pressable(
         label = "pressScale",
     )
     val haptics = LocalAppHaptics.current
+    // Física de botón: un roce leve al hundirse (junto con la escala) y el clic al soltar.
+    LaunchedEffect(pressed) { if (pressed && enabled) haptics?.pressDown() }
     return this
         .graphicsLayer {
             scaleX = scale
@@ -110,7 +112,7 @@ fun Modifier.pressable(
             interactionSource = interaction, indication = null, enabled = enabled,
             role = role, onClickLabel = onClickLabel,
         ) {
-            if (strongHaptic) haptics?.medium() else haptics?.selection()
+            if (strongHaptic) haptics?.click() else haptics?.tick()
             onClick()
         }
 }

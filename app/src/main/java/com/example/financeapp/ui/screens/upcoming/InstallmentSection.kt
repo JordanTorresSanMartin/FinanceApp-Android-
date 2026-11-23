@@ -78,6 +78,7 @@ fun InstallmentEditorSheet(
     onDelete: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     var name by rememberSaveable { mutableStateOf(editing?.name ?: "") }
     var amount by rememberSaveable { mutableStateOf(editing?.amount?.toString() ?: "") }
     var total by rememberSaveable { mutableStateOf(editing?.total?.toString() ?: "") }
@@ -158,6 +159,7 @@ fun InstallmentEditorSheet(
             Button(
                 onClick = {
                     val base = editing ?: InstallmentPlan(id = UUID.randomUUID().toString(), name = "", amount = 0, total = 1)
+                    haptics?.success()
                     onSave(
                         base.copy(name = name.trim(), amount = amountV, total = totalV, dueDay = dayV,
                             owedBy = owedBy.trim().ifEmpty { null }).withPaidCount(paidV)
@@ -184,7 +186,7 @@ fun InstallmentEditorSheet(
             title = { Text("Eliminar \"${editing.name}\"") },
             text = { Text("Se borrará este seguimiento de cuotas. No afecta tus movimientos.") },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete(editing.id); onDismiss() }) {
+                TextButton(onClick = { haptics?.destructive(); confirmDelete = false; onDelete(editing.id); onDismiss() }) {
                     Text("Eliminar", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },

@@ -49,7 +49,7 @@ fun RoundIconButton(
     Box(
         modifier = modifier
             .minimumInteractiveComponentSize()
-            .pressable(onClick = onClick)
+            .pressable(onClick = onClick, strongHaptic = true) // clic seco: es un botón, no una selección
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {

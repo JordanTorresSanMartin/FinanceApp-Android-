@@ -50,6 +50,7 @@ fun ProfileScreen(
 ) {
     val state = viewModel.uiState
     val context = LocalContext.current
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     var confirmLogout by remember { mutableStateOf(false) }
     val lockAvailable = remember { LockPrefs.isAvailable(context) }
     var lockEnabled by remember { mutableStateOf(LockPrefs.isEnabled(context)) }
@@ -90,7 +91,7 @@ fun ProfileScreen(
                         value = lockEnabled,
                         enabled = lockAvailable,
                         role = Role.Switch,
-                        onValueChange = { lockEnabled = it; LockPrefs.setEnabled(context, it) },
+                        onValueChange = { haptics?.toggle(it); lockEnabled = it; LockPrefs.setEnabled(context, it) },
                     )
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,

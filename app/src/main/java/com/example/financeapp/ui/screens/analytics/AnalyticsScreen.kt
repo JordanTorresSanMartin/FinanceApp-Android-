@@ -64,6 +64,7 @@ fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
 
     val selected = state.stats.firstOrNull { it.id == state.selectedId }
@@ -119,7 +120,7 @@ fun AnalyticsScreen(
                                 centerPrimary = if (selected != null) "${selected.pct.roundToInt()}%" else formatMoneyCLP(state.total),
                                 centerSecondary = selected?.name ?: "Gastado",
                                 selectedKey = state.selectedId,
-                                onSelect = viewModel::toggleSelected,
+                                onSelect = { haptics?.tick(); viewModel.toggleSelected(it) },
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(

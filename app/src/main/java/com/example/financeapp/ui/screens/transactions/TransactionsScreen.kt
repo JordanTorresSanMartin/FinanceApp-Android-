@@ -82,6 +82,7 @@ fun TransactionsScreen(
     viewModel: TransactionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
     val finance = FinanceTheme.colors
     val focusManager = LocalFocusManager.current
@@ -166,7 +167,7 @@ fun TransactionsScreen(
         // ── List ──
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
-            onRefresh = { viewModel.load(userRefresh = true) },
+            onRefresh = { haptics?.threshold(); viewModel.load(userRefresh = true) },
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
             val phase = when {
