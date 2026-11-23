@@ -42,4 +42,11 @@ interface FinanceRepository {
         frequency: String, billingDay: Int?, notes: String?,
     )
     suspend fun deleteRecurringPayment(id: String)
+
+    /** Fechas de pagos fijos registrados desde [since], agrupadas por nombre normalizado. */
+    suspend fun getRecurringPaymentDates(since: LocalDate): Map<String, List<java.time.LocalDate>>
+    /** Crea la transacción (gasto) que marca como pagado el período de [item]. */
+    suspend fun registerRecurringPayment(item: RecurringPayment, date: LocalDate)
+    /** Borra el último pago registrado ese día para ese pago fijo (deshacer). */
+    suspend fun undoRecurringPayment(item: RecurringPayment, date: LocalDate)
 }

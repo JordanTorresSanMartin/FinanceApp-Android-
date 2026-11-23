@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">FinanceApp</string>
+    <string name="widget_quick_add_label">Registro rápido</string>
+    <string name="widget_quick_add_description">Agrega un gasto o ingreso con un toque</string>
+    <string name="widget_payments_label">Pagos fijos</string>
+    <string name="widget_payments_description">Suscripciones, plan del celular, internet: qué está pagado y qué vence, con un toque para pagar</string>
+    <string name="widget_installments_label">Mis cuotas</string>
+    <string name="widget_installments_description">Cuántas cuotas te quedan y cuánto falta, con un toque para pagar la del mes</string>
 </resources>

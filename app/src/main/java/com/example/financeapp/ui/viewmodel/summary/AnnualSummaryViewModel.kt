@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.Calendar
+import kotlinx.coroutines.Job
+import com.example.financeapp.util.friendlyError
 import javax.inject.Inject
 
 data class AnnualSummaryUiState(
@@ -25,33 +26,33 @@ class AnnualSummaryViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        AnnualSummaryUiState(currentYear = Calendar.getInstance().get(Calendar.YEAR))
+        AnnualSummaryUiState(currentYear = java.time.LocalDate.now().year)
     )
     val uiState: StateFlow<AnnualSummaryUiState> = _uiState.asStateFlow()
 
-    init {
-        load()
-    }
+    private var loadJob: Job? = null
 
     fun load() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            val year = _uiState.value.currentYear
+            _uiState.value = _uiState.value.copy(error = null)
             try {
-                val summaries = repository.getAnnualSummary(_uiState.value.currentYear)
+                val summaries = repository.getAnnualSummary(year)
                 _uiState.value = _uiState.value.copy(summaries = summaries, isLoading = false)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(e))
             }
         }
     }
 
-    fun nextYear() {
-        _uiState.value = _uiState.value.copy(currentYear = _uiState.value.currentYear + 1)
-        load()
-    }
+    fun nextYear() = shiftYear(1)
+    fun previousYear() = shiftYear(-1)
 
-    fun previousYear() {
-        _uiState.value = _uiState.value.copy(currentYear = _uiState.value.currentYear - 1)
+    private fun shiftYear(delta: Int) {
+        _uiState.value = _uiState.value.copy(
+            currentYear = _uiState.value.currentYear + delta, isLoading = true, summaries = emptyList(),
+        )
         load()
     }
 }

@@ -1,5 +1,20 @@
 package com.example.financeapp.ui.screens.transactions
 
+import com.example.financeapp.ui.viewmodel.transactions.FILTER_ALL
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +74,7 @@ import com.example.financeapp.util.monthYearLabel
 import com.example.financeapp.util.parseHexColor
 import kotlinx.datetime.LocalDate
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
     onNavigateToNewTransaction: () -> Unit,
@@ -68,6 +84,7 @@ fun TransactionsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
     val finance = FinanceTheme.colors
+    val focusManager = LocalFocusManager.current
 
     val grouped: List<Pair<LocalDate, List<Transaction>>> =
         state.filteredTransactions.groupBy { it.date }.toList()
@@ -87,12 +104,12 @@ fun TransactionsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousMonth, size = 40.dp)
+                RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousMonth, "Mes anterior")
                 Text(
                     monthYearLabel(state.currentYear, state.currentMonth),
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                 )
-                RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextMonth, size = 40.dp)
+                RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextMonth, "Mes siguiente")
             }
             Spacer(Modifier.height(14.dp))
             // Search
@@ -100,15 +117,15 @@ fun TransactionsScreen(
                 value = state.searchQuery,
                 onValueChange = viewModel::onSearchQueryChange,
                 modifier = Modifier.fillMaxWidth().clip(CircleShape),
-                placeholder = { Text("Buscar transacción...") },
+                placeholder = { Text("Buscar por descripción o categoría") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 leadingIcon = { Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingIcon = {
                     if (state.searchQuery.isNotEmpty()) {
-                        Icon(
-                            Icons.Filled.Close, "Limpiar",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.clip(CircleShape).clickable { viewModel.onSearchQueryChange("") },
-                        )
+                        IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                            Icon(Icons.Filled.Close, "Limpiar búsqueda", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 },
                 singleLine = true,
@@ -122,8 +139,8 @@ fun TransactionsScreen(
             Spacer(Modifier.height(12.dp))
             // Filter chips
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterPill("Todos", state.filterType == "todos", MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.onPrimary) { viewModel.onFilterTypeChange("todos") }
+                FilterPill("Todos", state.filterType == FILTER_ALL, MaterialTheme.colorScheme.primary,
+                    MaterialTheme.colorScheme.onPrimary) { viewModel.onFilterTypeChange(FILTER_ALL) }
                 FilterPill("Ingresos", state.filterType == TxType.INGRESO, finance.income,
                     finance.onIncome) { viewModel.onFilterTypeChange(TxType.INGRESO) }
                 FilterPill("Gastos", state.filterType == TxType.GASTO, finance.expense,
@@ -147,8 +164,14 @@ fun TransactionsScreen(
         }
 
         // ── List ──
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            if (state.filteredTransactions.isEmpty()) {
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = { viewModel.load(userRefresh = true) },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
+            if (state.isLoading && state.transactions.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else if (state.filteredTransactions.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(40.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -159,9 +182,9 @@ fun TransactionsScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(56.dp),
                     )
                     Spacer(Modifier.height(10.dp))
-                    Text("Sin transacciones", style = MaterialTheme.typography.titleLarge)
+                    Text(if (state.isFiltering) "Sin resultados" else "Sin transacciones", style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "No hay movimientos este mes",
+                        if (state.isFiltering) "Ningún movimiento coincide con la búsqueda o el filtro" else "No hay movimientos este mes",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -197,7 +220,7 @@ fun TransactionsScreen(
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .padding(horizontal = 20.dp)
-                .padding(top = 14.dp, bottom = 28.dp),
+                .padding(top = 14.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FooterTotal(Modifier.weight(1f), "Ingresos", formatMoneyCLP(state.totalIncome), finance.income)
@@ -224,10 +247,13 @@ private fun FilterPill(
 ) {
     Box(
         modifier = Modifier
-            .pressable(onClick = onClick)
+            .pressable(onClick = onClick, role = Role.Tab)
+            .semantics { this.selected = selected }
             .clip(CircleShape)
             .background(if (selected) selColor else MaterialTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 18.dp, vertical = 9.dp),
+            .heightIn(min = 40.dp)
+            .padding(horizontal = 18.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
@@ -267,7 +293,7 @@ private fun TransactionRow(tx: Transaction, shape: RoundedCornerShape, onClick: 
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
-            .pressable(onClick = onClick)
+            .pressable(onClick = onClick, onClickLabel = "Editar")
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(14.dp),
@@ -275,7 +301,7 @@ private fun TransactionRow(tx: Transaction, shape: RoundedCornerShape, onClick: 
     ) {
         CategoryAvatar(icon = categoryIcon(tx.categories?.icon), color = catColor, size = 46.dp)
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(tx.description, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(tx.description, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     tx.categories?.name ?: "Sin categoría",

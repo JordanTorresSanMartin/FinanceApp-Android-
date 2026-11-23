@@ -9,8 +9,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import com.example.financeapp.util.friendlyError
 import kotlinx.datetime.LocalDate
-import java.util.Calendar
+import com.example.financeapp.util.shiftYearMonth
 import javax.inject.Inject
 
 data class TxLite(val id: String, val date: LocalDate, val amount: Double, val description: String)
@@ -49,22 +51,21 @@ class AnalyticsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(
         AnalyticsUiState(
-            currentYear = Calendar.getInstance().get(Calendar.YEAR),
-            currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1,
+            currentYear = java.time.LocalDate.now().year,
+            currentMonth = java.time.LocalDate.now().monthValue,
         )
     )
     val uiState: StateFlow<AnalyticsUiState> = _uiState.asStateFlow()
 
-    init {
-        load()
-    }
+    private var loadJob: Job? = null
 
     fun load() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            val year = _uiState.value.currentYear
+            val month = _uiState.value.currentMonth
+            _uiState.value = _uiState.value.copy(error = null)
             try {
-                val year = _uiState.value.currentYear
-                val month = _uiState.value.currentMonth
                 val txs = repository.getTransactionsByMonth(year, month).filter { it.type == TxType.GASTO }
                 val budgets = repository.getBudgetsForMonth(year, month)
 
@@ -96,7 +97,7 @@ class AnalyticsViewModel @Inject constructor(
                     isLoading = false, stats = stats, total = sum, selectedId = keepSelected,
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(e))
             }
         }
     }
@@ -111,11 +112,10 @@ class AnalyticsViewModel @Inject constructor(
     fun previousMonth() = shiftMonth(-1)
 
     private fun shiftMonth(delta: Int) {
-        var year = _uiState.value.currentYear
-        var month = _uiState.value.currentMonth + delta
-        if (month > 12) { month = 1; year++ }
-        if (month < 1) { month = 12; year-- }
-        _uiState.value = _uiState.value.copy(currentYear = year, currentMonth = month, selectedId = null)
+        val (year, month) = shiftYearMonth(_uiState.value.currentYear, _uiState.value.currentMonth, delta)
+        _uiState.value = _uiState.value.copy(
+            currentYear = year, currentMonth = month, selectedId = null, isLoading = true, stats = emptyList(), total = 0.0,
+        )
         load()
     }
 }

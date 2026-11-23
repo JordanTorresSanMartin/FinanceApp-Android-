@@ -1,5 +1,8 @@
 package com.example.financeapp.ui.screens.analytics
 
+import com.example.financeapp.domain.budgetStatus
+import com.example.financeapp.domain.BUDGET_WARNING
+import com.example.financeapp.domain.BUDGET_EXCEEDED
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -75,15 +78,15 @@ fun AnalyticsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, size = 40.dp)
+            RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, "Volver", size = 40.dp)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("ANÁLISIS POR CATEGORÍA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(monthYearLabel(state.currentYear, state.currentMonth), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
             Row {
-                RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousMonth, size = 40.dp)
+                RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousMonth, "Mes anterior", size = 40.dp)
                 Spacer(Modifier.width(8.dp))
-                RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextMonth, size = 40.dp)
+                RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextMonth, "Mes siguiente", size = 40.dp)
             }
         }
 
@@ -124,8 +127,8 @@ fun AnalyticsScreen(
             } else if (state.stats.isEmpty()) {
                 item { EmptyAnalytics() }
             } else {
-                items(state.stats.size) { idx ->
-                    LegendRow(state.stats[idx]) { viewModel.toggleSelected(state.stats[idx].id) }
+                items(state.stats, key = { it.id }) { stat ->
+                    LegendRow(stat) { viewModel.toggleSelected(stat.id) }
                 }
             }
         }
@@ -141,7 +144,7 @@ private fun LegendRow(stat: CatStat, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable { onClick() }
+            .clickable(onClickLabel = "Ver detalle de ${stat.name}") { onClick() }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -165,7 +168,7 @@ private fun CategoryDetail(stat: CatStat) {
     val hasBudget = stat.budget > 0
     val pctBudget = if (hasBudget) stat.total / stat.budget * 100 else 0.0
     val over = hasBudget && stat.total > stat.budget
-    val budgetColor = if (over) finance.expense else if (pctBudget >= 85) finance.warning else finance.income
+    val budgetColor = when (budgetStatus(pctBudget)) { BUDGET_EXCEEDED -> finance.expense; BUDGET_WARNING -> finance.warning; else -> finance.income }
 
     Column(modifier = Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Header

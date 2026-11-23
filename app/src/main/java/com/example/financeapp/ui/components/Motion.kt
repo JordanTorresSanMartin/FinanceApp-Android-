@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import com.example.financeapp.util.LocalAppHaptics
 
 /**
@@ -26,6 +27,8 @@ fun Modifier.pressable(
     enabled: Boolean = true,
     pressedScale: Float = 0.95f,
     strongHaptic: Boolean = false,
+    role: Role? = Role.Button,
+    onClickLabel: String? = null,
 ): Modifier {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -40,7 +43,11 @@ fun Modifier.pressable(
             scaleX = scale
             scaleY = scale
         }
-        .clickable(interactionSource = interaction, indication = null, enabled = enabled) {
+        // Sin ripple a propósito (el feedback es la escala); el rol sí se anuncia a TalkBack.
+        .clickable(
+            interactionSource = interaction, indication = null, enabled = enabled,
+            role = role, onClickLabel = onClickLabel,
+        ) {
             if (strongHaptic) haptics?.medium() else haptics?.selection()
             onClick()
         }

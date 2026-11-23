@@ -1,5 +1,7 @@
 package com.example.financeapp.ui.viewmodel.transactions
 
+import kotlin.math.roundToLong
+import com.example.financeapp.util.friendlyError
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.data.model.Category
@@ -32,7 +34,7 @@ data class EditTransactionUiState(
 
 @HiltViewModel
 class EditTransactionViewModel @Inject constructor(
-    private val repository: FinanceRepository
+    private val repository: FinanceRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditTransactionUiState())
@@ -55,7 +57,7 @@ class EditTransactionViewModel @Inject constructor(
                 }
                 _uiState.value = _uiState.value.copy(
                     loading = false,
-                    amount = tx.amount.toLong().toString(),
+                    amount = tx.amount.roundToLong().toString(),
                     description = tx.description,
                     type = tx.type,
                     dateText = tx.date.toString(),
@@ -65,7 +67,7 @@ class EditTransactionViewModel @Inject constructor(
                     categories = cats,
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(loading = false, error = e.message)
+                _uiState.value = _uiState.value.copy(loading = false, error = friendlyError(e, "No se pudo cargar la transacción"))
             }
         }
     }
@@ -76,6 +78,8 @@ class EditTransactionViewModel @Inject constructor(
     fun onCategorySelected(id: String) { _uiState.value = _uiState.value.copy(selectedCategoryId = id) }
     fun onNotesChange(value: String) { _uiState.value = _uiState.value.copy(notes = value) }
     fun onDateChange(iso: String) { _uiState.value = _uiState.value.copy(dateText = iso) }
+    fun setToday() = onDateChange(java.time.LocalDate.now().toString())
+    fun setYesterday() = onDateChange(java.time.LocalDate.now().minusDays(1).toString())
     fun consumeError() { _uiState.value = _uiState.value.copy(error = null) }
 
     fun save() {
@@ -90,6 +94,7 @@ class EditTransactionViewModel @Inject constructor(
         val date = try { LocalDate.parse(s.dateText) } catch (e: Exception) {
             _uiState.value = s.copy(error = "Fecha inválida (usa YYYY-MM-DD)."); return
         }
+        if (s.isSaving) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             try {
@@ -104,7 +109,7 @@ class EditTransactionViewModel @Inject constructor(
                 )
                 _uiState.value = _uiState.value.copy(isSaving = false, isSuccess = true)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isSaving = false, error = e.message ?: "Error al guardar")
+                _uiState.value = _uiState.value.copy(isSaving = false, error = friendlyError(e, "No se pudo guardar"))
             }
         }
     }
@@ -117,7 +122,7 @@ class EditTransactionViewModel @Inject constructor(
                 repository.deleteTransaction(id)
                 _uiState.value = _uiState.value.copy(isDeleting = false, isSuccess = true)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isDeleting = false, error = e.message ?: "No se pudo eliminar")
+                _uiState.value = _uiState.value.copy(isDeleting = false, error = friendlyError(e, "No se pudo eliminar"))
             }
         }
     }

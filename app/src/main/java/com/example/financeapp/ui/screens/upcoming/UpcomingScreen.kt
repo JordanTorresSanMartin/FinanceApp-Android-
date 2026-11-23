@@ -1,5 +1,16 @@
 package com.example.financeapp.ui.screens.upcoming
 
+import com.example.financeapp.util.LocalAppHaptics
+import com.example.financeapp.ui.viewmodel.upcoming.InstallmentsViewModel
+import com.example.financeapp.domain.InstallmentPlan
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.semantics.Role
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.rememberCoroutineScope
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
@@ -73,7 +84,12 @@ fun UpcomingScreen(
     onBack: () -> Unit,
     viewModel: UpcomingViewModel = hiltViewModel(),
     recurringVm: RecurringViewModel = hiltViewModel(),
+    cuotasVm: InstallmentsViewModel = hiltViewModel(),
 ) {
+    val plans by cuotasVm.plans.collectAsStateWithLifecycle()
+    var planEditorOpen by remember { mutableStateOf(false) }
+    var editingPlan by remember { mutableStateOf<InstallmentPlan?>(null) }
+    val haptics = LocalAppHaptics.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val recurring by recurringVm.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -81,11 +97,15 @@ fun UpcomingScreen(
     var editorOpen by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<RecurringPayment?>(null) }
 
+    val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val name = queryDisplayName(context, uri) ?: "estado.pdf"
-        val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
-        if (bytes != null) viewModel.uploadPdf(Base64.encodeToString(bytes, Base64.NO_WRAP), name)
+        // Leer y codificar fuera del hilo principal: un PDF grande trababa la UI.
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { readPdf(context, uri) }
+            result.onSuccess { (b64, name) -> viewModel.uploadPdf(b64, name) }
+                .onFailure { snackbar.showSnackbar(it.message ?: "No se pudo leer el PDF.") }
+        }
     }
     val pickPdf = { picker.launch(arrayOf("application/pdf")) }
 
@@ -103,15 +123,15 @@ fun UpcomingScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, size = 40.dp)
+                RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, "Volver", size = 40.dp)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("COMPROMISOS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Próximos pagos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
                 Box(
-                    modifier = Modifier.size(44.dp).clip(CircleShape)
+                    modifier = Modifier.size(48.dp).clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(enabled = !state.uploading) { pickPdf() },
+                        .clickable(enabled = !state.uploading, role = Role.Button, onClickLabel = "Subir estado de cuenta") { pickPdf() },
                     contentAlignment = Alignment.Center,
                 ) {
                     if (state.uploading) {
@@ -128,10 +148,31 @@ fun UpcomingScreen(
                 val finance = FinanceTheme.colors
                 val maxForecast = (state.forecast.maxOfOrNull { it.amount } ?: 1.0).coerceAtLeast(1.0)
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
+                    // ── Cuotas (locales) ──
+                    item {
+                        InstallmentSection(
+                            plans = plans,
+                            onAdd = { editingPlan = null; planEditorOpen = true },
+                            onEdit = { editingPlan = it; planEditorOpen = true },
+                            onPay = { plan ->
+                                haptics?.success()
+                                cuotasVm.pay(plan.id)
+                                val n = plan.paid + 1
+                                val msg = if (n >= plan.total) "¡Terminaste de pagar ${plan.name}!"
+                                else "Cuota $n de ${plan.total} de ${plan.name} pagada"
+                                scope.launch {
+                                    snackbar.currentSnackbarData?.dismiss()
+                                    val r = snackbar.showSnackbar(msg, actionLabel = "Deshacer", duration = SnackbarDuration.Short)
+                                    if (r == SnackbarResult.ActionPerformed) cuotasVm.undo(plan.id)
+                                }
+                            },
+                        )
+                    }
+
                     // ── Suscripciones y pagos fijos ──
                     item {
                         RecurringSection(
@@ -198,7 +239,7 @@ fun UpcomingScreen(
                                 Text("${state.installments.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        items(state.installments.size) { idx -> InstallmentCard(state.installments[idx]) }
+                        items(state.installments, key = { it.id }) { InstallmentCard(it) }
                         item {
                             Text(
                                 state.statements.joinToString("  ·  ") { (it.bank ?: "Banco") + (it.cardLast4?.let { l -> " ••$l" } ?: "") },
@@ -211,6 +252,15 @@ fun UpcomingScreen(
                 }
             }
         }
+    }
+
+    if (planEditorOpen) {
+        InstallmentEditorSheet(
+            editing = editingPlan,
+            onDismiss = { planEditorOpen = false },
+            onSave = cuotasVm::save,
+            onDelete = cuotasVm::delete,
+        )
     }
 
     if (editorOpen) {
@@ -327,6 +377,19 @@ private fun PasswordDialog(error: String?, uploading: Boolean, onCancel: () -> U
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancelar") } },
     )
+}
+
+private const val MAX_PDF_BYTES = 10L * 1024 * 1024
+
+/** (base64, nombre) del PDF elegido, o error legible si es muy grande o ilegible. */
+private fun readPdf(context: android.content.Context, uri: Uri): Result<Pair<String, String>> = runCatching {
+    val size = context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { c ->
+        if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+    }
+    if (size != null && size > MAX_PDF_BYTES) error("El PDF pesa más de 10 MB.")
+    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("No se pudo leer el PDF.")
+    if (bytes.size > MAX_PDF_BYTES) error("El PDF pesa más de 10 MB.")
+    Base64.encodeToString(bytes, Base64.NO_WRAP) to (queryDisplayName(context, uri) ?: "estado.pdf")
 }
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {

@@ -1,5 +1,6 @@
 package com.example.financeapp.util
 
+import android.provider.Settings
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
@@ -12,7 +13,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * de `expo-haptics` de la app RN (impacto / selección / éxito / error). El
  * `LocalHapticFeedback` de Compose es demasiado sutil en muchos dispositivos.
  */
-class AppHaptics(context: Context) {
+class AppHaptics(private val context: Context) {
 
     private val vibrator: Vibrator? = runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -23,19 +24,19 @@ class AppHaptics(context: Context) {
         }
     }.getOrNull()
 
+    /** Respeta "Vibración al tocar" de los ajustes del sistema. */
+    private fun enabled(): Boolean =
+        Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0
+
     private fun oneShot(ms: Long, amplitude: Int) {
         val v = vibrator ?: return
-        if (!v.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createOneShot(ms, amplitude))
-        } else {
-            @Suppress("DEPRECATION") v.vibrate(ms)
-        }
+        if (!v.hasVibrator() || !enabled()) return
+        v.vibrate(VibrationEffect.createOneShot(ms, amplitude))
     }
 
     private fun predefined(effect: Int, fallbackMs: Long, fallbackAmp: Int) {
         val v = vibrator ?: return
-        if (!v.hasVibrator()) return
+        if (!v.hasVibrator() || !enabled()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             v.vibrate(VibrationEffect.createPredefined(effect))
         } else {

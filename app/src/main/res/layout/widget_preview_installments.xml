@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vista previa en el selector de widgets (Android 12+). Imita el widget real. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="UseAppTint"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/preview_bg" android:orientation="vertical" android:padding="10dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="46dp" android:gravity="center_vertical" android:orientation="horizontal" android:paddingStart="6dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mis cuotas · 1/2 este mes" android:textColor="#FF46464F" android:textSize="13sp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quedan $904.910" android:textColor="#FF1B1B21" android:textSize="20sp" android:textStyle="bold" />
+        </LinearLayout>
+        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:background="@drawable/preview_btn" android:padding="11dp" android:src="@drawable/ic_widget_add" android:tint="#FF2B3A67" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp"
+        android:background="@drawable/preview_late" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="10dp">
+        <TextView android:layout_width="36dp" android:layout_height="36dp" android:background="@drawable/preview_avatar" android:backgroundTint="#FF3D8BD9"
+            android:gravity="center" android:text="N" android:textColor="#FFFFFFFF" android:textSize="16sp" android:textStyle="bold" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="10dp" android:orientation="vertical">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:text="Notebook" android:textColor="#FF1B1B21" android:textSize="15sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3/12" android:textColor="#FF4A5A8C" android:textSize="13sp" android:textStyle="bold" />
+            </LinearLayout>
+            <ProgressBar style="@android:style/Widget.Material.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="5dp"
+                android:layout_marginVertical="4dp" android:max="100" android:progress="25" android:progressTint="#FF4A5A8C" android:progressBackgroundTint="#FFD8DAE6" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:text="Atrasada 2 días · $45.990" android:textColor="#FFB3261E" android:textSize="12sp" />
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="40dp" android:background="@drawable/preview_pill" android:gravity="center"
+            android:paddingHorizontal="14dp" android:text="Pagar" android:textColor="#FFFFFFFF" android:textSize="13sp" android:textStyle="bold" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp"
+        android:background="@drawable/preview_ok" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="10dp">
+        <TextView android:layout_width="36dp" android:layout_height="36dp" android:background="@drawable/preview_avatar" android:backgroundTint="#FF2E9E8F"
+            android:gravity="center" android:text="S" android:textColor="#FFFFFFFF" android:textSize="16sp" android:textStyle="bold" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="10dp" android:orientation="vertical">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:text="Sillón living" android:textColor="#FF1B1B21" android:textSize="15sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="4/6" android:textColor="#FF4A5A8C" android:textSize="13sp" android:textStyle="bold" />
+            </LinearLayout>
+            <ProgressBar style="@android:style/Widget.Material.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="5dp"
+                android:layout_marginVertical="4dp" android:max="100" android:progress="66" android:progressTint="#FF4A5A8C" android:progressBackgroundTint="#FFD8DAE6" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:text="Quedan 2 · $36.000" android:textColor="#FF17703A" android:textSize="12sp" />
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="40dp" android:background="@drawable/preview_pill_ok" android:gravity="center"
+            android:paddingHorizontal="14dp" android:text="Pagada" android:textColor="#FF17703A" android:textSize="13sp" android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

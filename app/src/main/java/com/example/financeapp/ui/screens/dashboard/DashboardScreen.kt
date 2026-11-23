@@ -1,5 +1,12 @@
 package com.example.financeapp.ui.screens.dashboard
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import com.example.financeapp.domain.BUDGET_WARNING
+import com.example.financeapp.domain.BUDGET_EXCEEDED
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +73,7 @@ import com.example.financeapp.util.parseHexColor
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     onNavigateToNewTransaction: (String) -> Unit,
@@ -84,10 +92,16 @@ fun DashboardScreen(
                 onNext = viewModel::nextMonth,
                 onAnalytics = onNavigateToAnalytics,
             )
-            DashboardBody(
-                state = state,
-                onNavigateToUpcoming = onNavigateToUpcoming,
-            )
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { viewModel.load(userRefresh = true) },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                DashboardBody(
+                    state = state,
+                    onNavigateToUpcoming = onNavigateToUpcoming,
+                )
+            }
         }
         QuickAddFab(
             onSelectType = onNavigateToNewTransaction,
@@ -111,7 +125,7 @@ private fun DashboardHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RoundIconButton(Icons.Filled.ChevronLeft, onPrevious)
+        RoundIconButton(Icons.Filled.ChevronLeft, onPrevious, "Mes anterior")
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 "PRESUPUESTO",
@@ -121,11 +135,12 @@ private fun DashboardHeader(
             Text(monthLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RoundIconButton(Icons.Filled.ChevronRight, onNext)
+            RoundIconButton(Icons.Filled.ChevronRight, onNext, "Mes siguiente")
             Spacer(Modifier.width(8.dp))
             RoundIconButton(
                 icon = Icons.Filled.BarChart,
                 onClick = onAnalytics,
+                contentDescription = "Análisis por categoría",
                 container = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             )
@@ -181,12 +196,15 @@ private fun DashboardBody(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                 )
-                Text(
+                // autoSize: montos de 8+ dígitos se achican en vez de cortarse.
+                BasicText(
                     if (state.isLoading) "—" else formatMoneyCLP(cumulative),
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontWeight = FontWeight.Black,
+                        color = if (cumulative < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
                     maxLines = 1,
-                    color = if (cumulative < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 24.sp, maxFontSize = 45.sp),
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(
@@ -262,7 +280,7 @@ private fun DashboardBody(
                 modifier = Modifier
                     .padding(horizontal = 20.dp, vertical = 16.dp)
                     .fillMaxWidth()
-                    .pressable(onClick = onNavigateToUpcoming)
+                    .pressable(onClick = onNavigateToUpcoming, onClickLabel = "Ver próximos pagos")
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainer)
                     .padding(16.dp),
@@ -277,11 +295,15 @@ private fun DashboardBody(
                 }
                 Column(Modifier.weight(1f).padding(start = 14.dp)) {
                     Text("Próximos pagos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Cuotas de tus estados de cuenta",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    val rec = state.recurring
+                    val (subtitle, subColor) = when {
+                        rec == null || rec.total == 0 -> "Pagos fijos y cuotas de tus estados de cuenta" to MaterialTheme.colorScheme.onSurfaceVariant
+                        rec.overdue > 0 -> "${rec.overdue} ${if (rec.overdue == 1) "pago atrasado" else "pagos atrasados"} · ${rec.paid}/${rec.total} pagados" to finance.expense
+                        rec.dueSoon > 0 -> "${rec.dueSoon} por vencer · ${rec.paid}/${rec.total} pagados" to finance.warning
+                        rec.paid == rec.total -> "Pagos fijos al día (${rec.total}/${rec.total})" to finance.income
+                        else -> "${rec.paid}/${rec.total} pagos fijos pagados" to MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = subColor)
                 }
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowForwardIos, null,
@@ -359,13 +381,13 @@ private fun BudgetStatusCard(cat: BudgetStatus) {
     val finance = FinanceTheme.colors
     val status = cat.status ?: "ok"
     val statusColor = when (status) {
-        "excedido" -> finance.expense
-        "advertencia" -> finance.warning
+        BUDGET_EXCEEDED -> finance.expense
+        BUDGET_WARNING -> finance.warning
         else -> finance.income
     }
     val statusIcon = when (status) {
-        "excedido" -> Icons.Filled.Error
-        "advertencia" -> Icons.Filled.Warning
+        BUDGET_EXCEEDED -> Icons.Filled.Error
+        BUDGET_WARNING -> Icons.Filled.Warning
         else -> Icons.Filled.CheckCircle
     }
     val catColor = parseHexColor(cat.color, MaterialTheme.colorScheme.primary)
@@ -416,7 +438,7 @@ private fun BudgetStatusCard(cat: BudgetStatus) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (status == "excedido") {
+                if (status == BUDGET_EXCEEDED) {
                     Text(
                         "+${formatMoneyCLP(spent - budget)} excedido",
                         style = MaterialTheme.typography.labelMedium,

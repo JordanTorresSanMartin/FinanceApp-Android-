@@ -45,6 +45,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -63,7 +77,6 @@ import com.example.financeapp.util.LocalAppHaptics
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -71,7 +84,7 @@ fun LoginScreen(
         uiState = uiState,
         onLogin = viewModel::login,
         onSignUp = viewModel::signUp,
-        onLoginSuccess = onLoginSuccess,
+        onResetPassword = viewModel::resetPassword,
     )
 }
 
@@ -80,25 +93,29 @@ fun LoginContent(
     uiState: AuthUiState,
     onLogin: (String, String) -> Unit,
     onSignUp: (String, String) -> Unit,
-    onLoginSuccess: () -> Unit,
+    onResetPassword: (String) -> Unit,
 ) {
-    var authMode by remember { mutableStateOf(AuthMode.LOGIN) }
-    var email by remember { mutableStateOf("") }
+    var authMode by rememberSaveable { mutableStateOf(AuthMode.LOGIN) }
+    var email by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     val haptics = LocalAppHaptics.current
-
-    androidx.compose.runtime.LaunchedEffect(uiState.isSuccess) {
-        if (uiState.isSuccess) onLoginSuccess()
+    val focusManager = LocalFocusManager.current
+    val submit = {
+        focusManager.clearFocus()
+        haptics?.medium()
+        if (authMode == AuthMode.LOGIN) onLogin(email, password) else onSignUp(email, password)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp)
                 .statusBarsPadding()
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -148,8 +165,9 @@ fun LoginContent(
                 onValueChange = { email = it },
                 placeholder = { Text("Correo electrónico") },
                 leadingIcon = { Icon(Icons.Filled.Email, null, tint = MaterialTheme.colorScheme.primary) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.EmailAddress + ContentType.Username },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 shape = RoundedCornerShape(20.dp),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -169,11 +187,18 @@ fun LoginContent(
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     IconButton(onClick = { haptics?.selection(); passwordVisible = !passwordVisible }) {
-                        Icon(if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, null)
+                        Icon(
+                            if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña",
+                        )
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().semantics {
+                    contentType = if (authMode == AuthMode.LOGIN) ContentType.Password else ContentType.NewPassword
+                },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
                 shape = RoundedCornerShape(20.dp),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -191,10 +216,7 @@ fun LoginContent(
                 label = "button_scale",
             )
             Button(
-                onClick = {
-                    haptics?.medium()
-                    if (authMode == AuthMode.LOGIN) onLogin(email, password) else onSignUp(email, password)
-                },
+                onClick = submit,
                 modifier = Modifier.fillMaxWidth().height(64.dp).scale(buttonScale),
                 shape = RoundedCornerShape(24.dp),
                 enabled = !uiState.isLoading,
@@ -213,14 +235,23 @@ fun LoginContent(
 
             uiState.error?.let {
                 Spacer(Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
             uiState.info?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
             }
 
-            Spacer(Modifier.height(24.dp))
+            if (authMode == AuthMode.LOGIN) {
+                TextButton(onClick = { onResetPassword(email) }, enabled = !uiState.isLoading) {
+                    Text("¿Olvidaste tu contraseña?")
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
 
             TextButton(onClick = {
                 haptics?.selection()
@@ -241,6 +272,6 @@ fun LoginContent(
 @Composable
 fun LoginScreenPreview() {
     FinanceAppTheme {
-        LoginContent(uiState = AuthUiState(), onLogin = { _, _ -> }, onSignUp = { _, _ -> }, onLoginSuccess = {})
+        LoginContent(uiState = AuthUiState(), onLogin = { _, _ -> }, onSignUp = { _, _ -> }, onResetPassword = {})
     }
 }

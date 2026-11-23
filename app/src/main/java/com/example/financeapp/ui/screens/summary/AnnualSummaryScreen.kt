@@ -70,12 +70,12 @@ fun AnnualSummaryScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousYear, size = 40.dp)
+            RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousYear, "Año anterior")
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("RESUMEN ANUAL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("${state.currentYear}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
-            RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextYear, size = 40.dp)
+            RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextYear, "Año siguiente")
         }
 
         if (state.isLoading) {

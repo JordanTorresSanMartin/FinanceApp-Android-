@@ -17,6 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,20 +39,26 @@ import com.example.financeapp.util.LocalAppHaptics
 fun RoundIconButton(
     icon: ImageVector,
     onClick: () -> Unit,
+    contentDescription: String,
     modifier: Modifier = Modifier,
     container: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     size: Dp = 44.dp,
 ) {
+    // El círculo visible puede medir 40–44dp, pero el área táctil es siempre ≥ 48dp.
     Box(
         modifier = modifier
+            .minimumInteractiveComponentSize()
             .pressable(onClick = onClick)
-            .size(size)
-            .clip(CircleShape)
-            .background(container),
+            .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = contentColor)
+        Box(
+            Modifier.size(size).clip(CircleShape).background(container),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = contentColor)
+        }
     }
 }
 
@@ -90,7 +99,7 @@ fun MonthNavHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RoundIconButton(Icons.Filled.ChevronLeft, onPrevious)
+        RoundIconButton(Icons.Filled.ChevronLeft, onPrevious, "Anterior")
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (sublabel != null) {
                 Text(
@@ -102,7 +111,7 @@ fun MonthNavHeader(
             Text(label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RoundIconButton(Icons.Filled.ChevronRight, onNext)
+            RoundIconButton(Icons.Filled.ChevronRight, onNext, "Siguiente")
             if (trailing != null) {
                 Box(Modifier.padding(start = 8.dp)) { trailing() }
             }

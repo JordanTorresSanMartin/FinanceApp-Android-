@@ -19,3 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# Stack traces legibles en crashes de release.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Modelos @Serializable (kotlinx.serialization trae reglas, esto cubre los nombres usados por Supabase).
+-keep,includedescriptorclasses class com.example.financeapp.data.model.**$$serializer { *; }
+-keepclassmembers class com.example.financeapp.data.model.** { *** Companion; }
+-keepclasseswithmembers class com.example.financeapp.data.model.** { kotlinx.serialization.KSerializer serializer(...); }
+# Rutas de navegación type-safe (@Serializable)
+-keep class com.example.financeapp.ui.navigation.NavRoute** { *; }
+-dontwarn org.slf4j.**

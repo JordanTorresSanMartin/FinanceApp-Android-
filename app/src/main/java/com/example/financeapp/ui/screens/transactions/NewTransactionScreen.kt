@@ -1,5 +1,17 @@
 package com.example.financeapp.ui.screens.transactions
 
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +62,10 @@ fun NewTransactionScreen(
     val snackbar = remember { SnackbarHostState() }
     val haptics = LocalAppHaptics.current
 
+    var confirmDiscard by remember { mutableStateOf(false) }
+    val close = { if (viewModel.hasChanges) confirmDiscard = true else onBack() }
+    BackHandler(onBack = close)
+
     LaunchedEffect(Unit) { viewModel.setInitialType(initialType) }
     LaunchedEffect(state.isSuccess) { if (state.isSuccess) { haptics?.success(); onBack() } }
     LaunchedEffect(state.error) {
@@ -65,10 +81,10 @@ fun NewTransactionScreen(
                 title = "Nueva transacción",
                 type = state.type,
                 saving = state.isLoading,
-                onClose = onBack,
+                onClose = close,
                 onSave = viewModel::save,
             )
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)).verticalScroll(rememberScrollState())) {
                 TransactionFormBody(
                     type = state.type,
                     onTypeChange = viewModel::onTypeChange,
@@ -88,6 +104,16 @@ fun NewTransactionScreen(
                 )
             }
         }
+    }
+
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("¿Descartar transacción?") },
+            text = { Text("Perderás lo que escribiste.") },
+            confirmButton = { TextButton(onClick = { confirmDiscard = false; onBack() }) { Text("Descartar") } },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Seguir editando") } },
+        )
     }
 }
 
@@ -113,14 +139,15 @@ internal fun TransactionTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RoundIconButton(Icons.Filled.Close, onClose, size = 40.dp)
+        RoundIconButton(Icons.Filled.Close, onClose, "Cerrar", size = 40.dp)
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(999.dp))
                 .background(activeColor)
-                .clickable(enabled = !saving) { haptics?.medium(); onSave() }
-                .padding(horizontal = 18.dp, vertical = 10.dp),
+                .clickable(enabled = !saving, role = Role.Button) { haptics?.medium(); onSave() }
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 18.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (saving) {

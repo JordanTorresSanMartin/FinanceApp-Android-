@@ -1,7 +1,9 @@
 package com.example.financeapp.data.repository
 
 import com.example.financeapp.data.model.*
+import com.example.financeapp.domain.RECURRING_NOTE
 import com.example.financeapp.domain.repository.FinanceRepository
+import com.example.financeapp.util.toJavaLocalDate
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
@@ -35,7 +37,10 @@ class FinanceRepositoryImpl @Inject constructor(
 
     override fun currentUserId(): String? = auth.currentUserOrNull()?.id
     override fun currentUserEmail(): String? = auth.currentUserOrNull()?.email
-    override suspend fun signOut() = auth.signOut()
+    // Sin red, signOut() falla en el servidor: igual borramos la sesión local.
+    override suspend fun signOut() {
+        runCatching { auth.signOut() }.onFailure { auth.clearSession() }
+    }
 
     // ── Resúmenes / presupuesto ──────────────────────────────────────────────
     override suspend fun getMonthlySummary(year: Int, month: Int): MonthlySummary? =
@@ -117,7 +122,7 @@ class FinanceRepositoryImpl @Inject constructor(
     override suspend fun getTransactionsByMonth(year: Int, month: Int): List<Transaction> =
         withContext(Dispatchers.IO) {
             val start = LocalDate(year, month, 1)
-            val end = LocalDate(year, month, lastDayOfMonth(year, month))
+            val end = LocalDate(year, month, java.time.YearMonth.of(year, month).lengthOfMonth())
             postgrest["transactions"].select(Columns.raw(TX_WITH_CATEGORY)) {
                 filter { gte("date", start); lte("date", end) }
                 order("date", Order.DESCENDING)
@@ -268,12 +273,34 @@ class FinanceRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getRecurringPaymentDates(since: LocalDate): Map<String, List<java.time.LocalDate>> =
+        withContext(Dispatchers.IO) {
+            postgrest["transactions"].select {
+                filter { eq("notes", RECURRING_NOTE); gte("date", since) }
+            }.decodeList<Transaction>()
+                .groupBy({ it.description.trim().lowercase() }, { it.date.toJavaLocalDate() })
+        }
+
+    override suspend fun registerRecurringPayment(item: RecurringPayment, date: LocalDate) =
+        insertTransaction(
+            date = date,
+            description = item.name,
+            categoryId = item.categoryId,
+            type = TxType.GASTO,
+            amount = item.amount,
+            notes = RECURRING_NOTE,
+        )
+
+    override suspend fun undoRecurringPayment(item: RecurringPayment, date: LocalDate) {
+        val tx = withContext(Dispatchers.IO) {
+            postgrest["transactions"].select {
+                filter { eq("notes", RECURRING_NOTE); eq("date", date.toString()); eq("description", item.name) }
+            }.decodeList<Transaction>()
+        }.lastOrNull() ?: return
+        deleteTransaction(tx.id ?: return)
+    }
+
     private fun requireUserId(): String =
         currentUserId() ?: throw IllegalStateException("Usuario no autenticado")
 
-    private fun lastDayOfMonth(year: Int, month: Int): Int = when (month) {
-        4, 6, 9, 11 -> 30
-        2 -> if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) 29 else 28
-        else -> 31
-    }
 }

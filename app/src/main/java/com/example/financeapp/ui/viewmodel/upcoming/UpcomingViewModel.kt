@@ -1,5 +1,6 @@
 package com.example.financeapp.ui.viewmodel.upcoming
 
+import com.example.financeapp.util.friendlyError
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.data.model.ForecastMonth
@@ -45,7 +46,6 @@ class UpcomingViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val allStatements = repository.getStatements()
                 // Último estado de cuenta por banco (snapshot vigente de cada tarjeta).
@@ -80,7 +80,7 @@ class UpcomingViewModel @Inject constructor(
                     forecast = forecast,
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoading = false, message = e.message)
+                _uiState.value = _uiState.value.copy(isLoading = false, message = friendlyError(e))
             }
         }
     }
@@ -136,7 +136,7 @@ class UpcomingViewModel @Inject constructor(
                 )
                 load()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(uploading = false, message = e.message ?: "No se pudo subir el PDF.")
+                _uiState.value = _uiState.value.copy(uploading = false, message = friendlyError(e, "No se pudo subir el PDF."))
             }
         }
     }

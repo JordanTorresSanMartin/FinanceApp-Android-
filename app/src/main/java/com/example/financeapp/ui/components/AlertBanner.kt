@@ -1,5 +1,10 @@
 package com.example.financeapp.ui.components
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.Role
+import com.example.financeapp.domain.budgetStatus
+import com.example.financeapp.domain.BUDGET_WARNING
+import com.example.financeapp.domain.BUDGET_EXCEEDED
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,13 +49,14 @@ fun AlertBanner(
     modifier: Modifier = Modifier,
 ) {
     val finance = FinanceTheme.colors
-    val excedidas = items.filter { it.budget > 0 && it.spent / it.budget >= 1.0 }
-    val advertencia = items.filter { it.budget > 0 && it.spent / it.budget >= 0.85 && it.spent / it.budget < 1.0 }
+    val withBudget = items.filter { it.budget > 0 }
+    val excedidas = withBudget.filter { budgetStatus(it.spent / it.budget * 100) == BUDGET_EXCEEDED }
+    val advertencia = withBudget.filter { budgetStatus(it.spent / it.budget * 100) == BUDGET_WARNING }
 
     if (excedidas.isEmpty() && advertencia.isEmpty()) return
 
-    var dismissed by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(true) }
+    var dismissed by rememberSaveable { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(true) }
     if (dismissed) return
 
     val hasExcedidas = excedidas.isNotEmpty()
@@ -67,7 +73,7 @@ fun AlertBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded }
+                .clickable(onClickLabel = if (expanded) "Contraer detalle" else "Ver detalle") { expanded = !expanded }
                 .padding(14.dp),
             verticalAlignment = Alignment.Top,
         ) {
@@ -102,15 +108,15 @@ fun AlertBanner(
                 if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                 contentDescription = null, tint = accent,
             )
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = "Cerrar",
-                tint = accent,
+            Box(
                 modifier = Modifier
-                    .padding(start = 8.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
-                    .clickable { dismissed = true },
-            )
+                    .clickable(onClickLabel = "Ocultar alertas", role = Role.Button) { dismissed = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "Ocultar alertas", tint = accent)
+            }
         }
 
         AnimatedVisibility(visible = expanded) {

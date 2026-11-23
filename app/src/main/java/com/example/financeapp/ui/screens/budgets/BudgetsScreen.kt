@@ -1,5 +1,14 @@
 package com.example.financeapp.ui.screens.budgets
 
+import com.example.financeapp.util.groupThousands
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
+import com.example.financeapp.domain.BUDGET_WARNING
+import com.example.financeapp.domain.BUDGET_EXCEEDED
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,12 +79,12 @@ fun BudgetsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousMonth, size = 40.dp)
+            RoundIconButton(Icons.Filled.ChevronLeft, viewModel::previousMonth, "Mes anterior")
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("PRESUPUESTO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(monthYearLabel(state.currentYear, state.currentMonth), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
-            RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextMonth, size = 40.dp)
+            RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextMonth, "Mes siguiente")
         }
 
         // Totals card
@@ -110,10 +119,21 @@ fun BudgetsScreen(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().imePadding(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                state.error?.let { err ->
+                    item {
+                        Text(
+                            err,
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.errorContainer).padding(12.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
                 item {
                     AlertBanner(
                         items = state.items.map {
@@ -141,8 +161,8 @@ private fun BudgetItemCard(
 ) {
     val finance = FinanceTheme.colors
     val statusColor = when (item.status) {
-        "excedido" -> finance.expense
-        "advertencia" -> finance.warning
+        BUDGET_EXCEEDED -> finance.expense
+        BUDGET_WARNING -> finance.warning
         else -> finance.income
     }
     val catColor = parseHexColor(item.color, MaterialTheme.colorScheme.primary)
@@ -150,6 +170,12 @@ private fun BudgetItemCard(
         mutableStateOf(if (item.budgetAmount > 0) item.budgetAmount.toLong().toString() else "")
     }
     var wasFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val commit = { onSave((text.toLongOrNull() ?: 0L).toDouble()) }
+    // Si la tarjeta sale de pantalla o cambias de pestaña con el campo editado, guarda igual.
+    val latestCommit by rememberUpdatedState(commit)
+    val latestFocused by rememberUpdatedState(wasFocused)
+    DisposableEffect(item.categoryId) { onDispose { if (latestFocused) latestCommit() } }
 
     Column(
         modifier = Modifier
@@ -173,20 +199,20 @@ private fun BudgetItemCard(
                 Text("Presupuesto asignado", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(6.dp))
                 TextField(
-                    value = text,
-                    onValueChange = { text = it.filter { c -> c.isDigit() } },
+                    value = groupThousands(text),
+                    onValueChange = { text = it.filter { c -> c.isDigit() }.take(12) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .onFocusChanged { focus ->
-                            if (wasFocused && !focus.isFocused) {
-                                onSave((text.toLongOrNull() ?: 0L).toDouble())
-                            }
+                            if (wasFocused && !focus.isFocused) commit()
                             wasFocused = focus.isFocused
                         },
                     placeholder = { Text("0") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    prefix = { Text("$") },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -210,7 +236,7 @@ private fun BudgetItemCard(
                     Text(
                         formatMoneyCLP(item.spent),
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                        color = if (item.status == "excedido") finance.expense else MaterialTheme.colorScheme.onSurface,
+                        color = if (item.status == BUDGET_EXCEEDED) finance.expense else MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

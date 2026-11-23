@@ -1,5 +1,25 @@
 package com.example.financeapp.ui.screens.transactions
 
+import java.time.ZoneOffset
+import java.time.Instant
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,7 +67,7 @@ import com.example.financeapp.util.groupThousands
 import com.example.financeapp.util.parseHexColor
 
 /** Cuerpo compartido del formulario de transacción (nueva y editar). */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionFormBody(
     type: String,
@@ -71,6 +91,8 @@ fun TransactionFormBody(
     val finance = FinanceTheme.colors
     val activeColor = if (type == TxType.GASTO) finance.expense else finance.income
     val filtered = categories.filter { it.type == type || it.type == "ambos" }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    val parsedDate = remember(dateText) { runCatching { java.time.LocalDate.parse(dateText) }.getOrNull() }
 
     Column(
         modifier = modifier.padding(20.dp),
@@ -141,9 +163,9 @@ fun TransactionFormBody(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     )
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Monto en pesos" },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
@@ -156,13 +178,29 @@ fun TransactionFormBody(
         // Description
         FormTextField(
             value = description, onValueChange = onDescriptionChange, placeholder = "Descripción",
+            capitalization = KeyboardCapitalization.Sentences,
         )
 
         // Date
         Text("Fecha", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) {
-                FormTextField(value = dateText, onValueChange = onDateChange, placeholder = "YYYY-MM-DD")
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .clickable(role = Role.Button, onClickLabel = "Elegir fecha") { showDatePicker = true }
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.CalendarMonth, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    parsedDate?.let { longDateLabel(it) } ?: "Elegir fecha",
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                )
             }
             DateChip("Hoy", onToday)
             DateChip("Ayer", onYesterday)
@@ -184,7 +222,8 @@ fun TransactionFormBody(
                     val catColor = parseHexColor(cat.color, MaterialTheme.colorScheme.primary)
                     Row(
                         modifier = Modifier
-                            .pressable(onClick = { onCategorySelected(id) })
+                            .pressable(onClick = { onCategorySelected(id) }, role = Role.RadioButton)
+                            .semantics { this.selected = selected }
                             .clip(CircleShape)
                             .background(if (selected) catColor.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerLow)
                             .border(1.5.dp, if (selected) catColor else Color.Transparent, CircleShape)
@@ -206,11 +245,35 @@ fun TransactionFormBody(
         // Notes
         FormTextField(
             value = notes, onValueChange = onNotesChange, placeholder = "Notas (opcional)",
-            minLines = 3,
+            minLines = 3, capitalization = KeyboardCapitalization.Sentences,
         )
         Spacer(Modifier.height(20.dp))
     }
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = (parsedDate ?: java.time.LocalDate.now())
+                .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let {
+                        onDateChange(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString())
+                    }
+                    showDatePicker = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") } },
+        ) { DatePicker(state = pickerState) }
+    }
 }
+
+/** "Lunes, 17 nov 2026" */
+private fun longDateLabel(d: java.time.LocalDate): String =
+    d.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMM yyyy", java.util.Locale.forLanguageTag("es-CL")))
+        .replaceFirstChar { it.uppercase() }
 
 @Composable
 private fun ToggleHalf(
@@ -225,7 +288,8 @@ private fun ToggleHalf(
     Row(
         modifier = modifier
             .fillMaxHeight()
-            .pressable(onClick = onClick)
+            .pressable(onClick = onClick, role = Role.Tab)
+            .semantics { this.selected = selected }
             .clip(CircleShape)
             .background(if (selected) container else Color.Transparent),
         horizontalArrangement = Arrangement.Center,
@@ -252,8 +316,10 @@ private fun DateChip(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .clip(CircleShape)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .clickable(role = Role.Button) { onClick() }
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -265,11 +331,13 @@ private fun FormTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     minLines: Int = 1,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
 ) {
     TextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder) },
+        label = { Text(placeholder) },
+        keyboardOptions = KeyboardOptions(capitalization = capitalization, imeAction = if (minLines == 1) ImeAction.Next else ImeAction.Default),
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
         minLines = minLines,
         singleLine = minLines == 1,

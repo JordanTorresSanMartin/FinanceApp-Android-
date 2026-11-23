@@ -1,5 +1,11 @@
 package com.example.financeapp.ui.screens.transactions
 
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,7 +82,7 @@ fun EditTransactionScreen(
             if (state.loading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
-                Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)).verticalScroll(rememberScrollState())) {
                     TransactionFormBody(
                         type = state.type,
                         onTypeChange = viewModel::onTypeChange,
@@ -86,8 +92,8 @@ fun EditTransactionScreen(
                         onDescriptionChange = viewModel::onDescriptionChange,
                         dateText = state.dateText,
                         onDateChange = viewModel::onDateChange,
-                        onToday = { },
-                        onYesterday = { },
+                        onToday = viewModel::setToday,
+                        onYesterday = viewModel::setYesterday,
                         categories = state.categories,
                         selectedCategoryId = state.selectedCategoryId,
                         onCategorySelected = viewModel::onCategorySelected,
@@ -104,7 +110,7 @@ fun EditTransactionScreen(
                             .height(52.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.errorContainer)
-                            .clickable(enabled = !state.isDeleting) { confirmDelete = true },
+                            .clickable(enabled = !state.isDeleting, role = Role.Button) { confirmDelete = true },
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

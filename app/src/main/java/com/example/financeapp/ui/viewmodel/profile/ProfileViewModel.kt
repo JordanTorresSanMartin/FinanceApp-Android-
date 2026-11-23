@@ -4,9 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.domain.repository.FinanceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,21 +17,12 @@ class ProfileViewModel @Inject constructor(
     private val repository: FinanceRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ProfileUiState())
-    val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
-
-    init {
-        val email = repository.currentUserEmail().orEmpty()
-        _uiState.value = ProfileUiState(
-            email = email,
-            name = email.substringBefore('@').ifBlank { "Usuario" },
-        )
+    val uiState: ProfileUiState = repository.currentUserEmail().orEmpty().let { email ->
+        ProfileUiState(email = email, name = email.substringBefore('@').ifBlank { "Usuario" })
     }
 
-    fun logout(onDone: () -> Unit) {
-        viewModelScope.launch {
-            try { repository.signOut() } catch (_: Exception) {}
-            onDone()
-        }
+    /** La navegación al login la hace FinanceNavHost al cambiar la sesión. */
+    fun logout() {
+        viewModelScope.launch { runCatching { repository.signOut() } }
     }
 }

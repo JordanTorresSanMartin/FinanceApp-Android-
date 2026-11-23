@@ -44,7 +44,6 @@ fun MainScaffold(
     onNavigateToEditTransaction: (String) -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToUpcoming: () -> Unit,
-    onLogout: () -> Unit,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -117,7 +116,7 @@ fun MainScaffold(
             }
             composable<NavRoute.Budgets> { BudgetsScreen() }
             composable<NavRoute.AnnualSummary> { AnnualSummaryScreen() }
-            composable<NavRoute.Profile> { ProfileScreen(onLogout = onLogout) }
+            composable<NavRoute.Profile> { ProfileScreen() }
         }
     }
 }

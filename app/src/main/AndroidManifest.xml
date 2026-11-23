@@ -19,6 +19,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.FinanceApp">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -29,13 +30,36 @@
         <receiver
             android:name=".ui.widget.QuickAddWidgetReceiver"
             android:exported="true"
-            android:label="Finance QuickAdd">
+            android:label="@string/widget_quick_add_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/quick_add_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.widget.FixedPaymentsWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_payments_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/fixed_payments_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".ui.widget.PaymentStatusWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_installments_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/installments_widget_info" />
         </receiver>
 
     </application>

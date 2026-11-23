@@ -18,8 +18,11 @@ private val esES: Locale = Locale.forLanguageTag("es-ES")
 
 private val clpFormat: NumberFormat = NumberFormat.getIntegerInstance(esCL)
 
-/** "$1.500" — redondea y agrega separador de miles, igual que RN. */
-fun formatMoneyCLP(amount: Double): String = "$" + clpFormat.format(amount.roundToLong())
+/** "$1.500" / "-$1.500" — redondea y agrega separador de miles. */
+fun formatMoneyCLP(amount: Double): String {
+    val rounded = amount.roundToLong()
+    return (if (rounded < 0) "-$" else "$") + clpFormat.format(abs(rounded))
+}
 
 /** "1.500" — solo dígitos agrupados con separador de miles (campos de monto). */
 fun groupThousands(digits: String): String {
@@ -29,10 +32,11 @@ fun groupThousands(digits: String): String {
 
 /** "1k" / "1.5M" — abreviado, usado en tablas y forecast. */
 fun formatK(amount: Double): String {
-    val n = amount
-    return when {
-        abs(n) >= 1_000_000 -> "$" + String.format(Locale.US, "%.1f", n / 1_000_000) + "M"
-        abs(n) >= 1_000 -> "$" + (n / 1_000).roundToLong() + "k"
+    val n = abs(amount)
+    val sign = if (amount < 0) "-" else ""
+    return sign + when {
+        n >= 1_000_000 -> "$" + String.format(Locale.US, "%.1f", n / 1_000_000) + "M"
+        n >= 1_000 -> "$" + (n / 1_000).roundToLong() + "k"
         else -> "$" + n.roundToLong()
     }
 }
@@ -81,3 +85,7 @@ fun shortDateLabel(date: LocalDate): String {
 
 /** ISO "YYYY-MM-DD" de un LocalDate. */
 fun LocalDate.iso(): String = toString()
+
+/** (año, mes) desplazado [delta] meses. */
+fun shiftYearMonth(year: Int, month: Int, delta: Int): Pair<Int, Int> =
+    java.time.YearMonth.of(year, month).plusMonths(delta.toLong()).let { it.year to it.monthValue }
