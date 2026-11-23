@@ -1,0 +1,10 @@
+# Baseline Profile: Android compila este código por adelantado al instalar (Play o profileinstaller),
+# así la primera vez que se abre cada pantalla no corre interpretado. Medido en el teléfono (release,
+# speed-profile): cambiar de pestaña pasó de 5,8 % a 3,7–5,1 % de fotogramas lentos.
+# ponytail: incluye toda la app (es chica, ~8k líneas); si crece mucho, generar uno con Macrobenchmark.
+HSPLcom/example/financeapp/**->**(**)**
+Lcom/example/financeapp/**;
+# Cambio de pestaña: navegación y transiciones animadas (sus perfiles de librería no cubren este camino).
+HSPLandroidx/navigation/compose/**->**(**)**
+HSPLandroidx/navigation/**->**(**)**
+HSPLandroidx/compose/animation/**->**(**)**

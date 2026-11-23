@@ -56,7 +56,7 @@ internal fun FijosPage(
             Spacer(Modifier.height(8.dp))
         }
         if (state.items.isEmpty() && state.isLoading) {
-            item(key = "skeleton") { SkeletonScope { SkeletonCardList(rows = 3) } }
+            item(key = "skeleton") { SkeletonScope(Modifier.animateItem()) { SkeletonCardList(rows = 3) } }
         }
         if (state.items.isEmpty() && !state.isLoading) {
             item(key = "empty") {

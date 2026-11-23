@@ -3,6 +3,8 @@ package com.example.financeapp.ui.screens.dashboard
 import com.example.financeapp.ui.components.Bone
 import com.example.financeapp.ui.components.SkeletonCardList
 import com.example.financeapp.ui.components.SkeletonScope
+import com.example.financeapp.ui.components.FadeThrough
+import com.example.financeapp.ui.components.animatedAmount
 
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.TextAutoSize
@@ -86,7 +88,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -201,17 +203,17 @@ private fun DashboardBody(
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                 )
                 // autoSize: montos de 8+ dígitos se achican en vez de cortarse.
-                if (state.isLoading) SkeletonScope {
+                FadeThrough(state.isLoading) { loading -> if (loading) SkeletonScope {
                     Bone(Modifier.padding(vertical = 6.dp).width(220.dp).height(44.dp), RoundedCornerShape(12.dp), MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f))
                 } else BasicText(
-                    formatMoneyCLP(cumulative),
+                    formatMoneyCLP(animatedAmount(cumulative)),
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontWeight = FontWeight.Black,
                         color = if (cumulative < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
                     ),
                     maxLines = 1,
                     autoSize = TextAutoSize.StepBased(minFontSize = 24.sp, maxFontSize = 45.sp),
-                )
+                ) }
                 Spacer(Modifier.height(12.dp))
                 Row(
                     modifier = Modifier
@@ -259,7 +261,7 @@ private fun DashboardBody(
                 TonalAmountCard(
                     modifier = Modifier.weight(1f),
                     label = "Ingresos",
-                    amount = if (state.isLoading) null else formatMoneyCLP(income),
+                    amount = if (state.isLoading) null else income,
                     container = finance.incomeContainer,
                     onContainer = finance.onIncomeContainer,
                     iconBg = finance.income,
@@ -269,7 +271,7 @@ private fun DashboardBody(
                 TonalAmountCard(
                     modifier = Modifier.weight(1f),
                     label = "Gastos",
-                    amount = if (state.isLoading) null else formatMoneyCLP(expenses),
+                    amount = if (state.isLoading) null else expenses,
                     container = finance.expenseContainer,
                     onContainer = finance.onExpenseContainer,
                     iconBg = finance.expense,
@@ -334,14 +336,14 @@ private fun DashboardBody(
         }
 
         if (state.isLoading) {
-            item {
-                SkeletonScope(Modifier.padding(horizontal = 20.dp)) { SkeletonCardList(rows = 4) }
+            item(key = "skeleton") {
+                SkeletonScope(Modifier.animateItem().padding(horizontal = 20.dp)) { SkeletonCardList(rows = 4) }
             }
         } else if (state.budgetStatus.isEmpty()) {
             item { EmptyBudget() }
         } else {
             items(state.budgetStatus, key = { it.categoryId ?: it.categoryName ?: "" }) { cat ->
-                BudgetStatusCard(cat)
+                Box(Modifier.animateItem()) { BudgetStatusCard(cat) } // entra con fundido al reemplazar el esqueleto
             }
         }
     }
@@ -351,7 +353,7 @@ private fun DashboardBody(
 private fun TonalAmountCard(
     modifier: Modifier,
     label: String,
-    amount: String?, // null = cargando
+    amount: Double?, // null = cargando
     container: Color,
     onContainer: Color,
     iconBg: Color,
@@ -375,8 +377,10 @@ private fun TonalAmountCard(
             Text(label, style = MaterialTheme.typography.labelLarge, color = onContainer)
         }
         Spacer(Modifier.height(12.dp))
-        if (amount == null) SkeletonScope { Bone(Modifier.padding(vertical = 4.dp).width(110.dp).height(24.dp), color = onContainer.copy(alpha = 0.16f)) }
-        else Text(amount, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = onContainer)
+        FadeThrough(amount == null) { loading ->
+            if (loading) SkeletonScope { Bone(Modifier.padding(vertical = 4.dp).width(110.dp).height(24.dp), color = onContainer.copy(alpha = 0.16f)) }
+            else Text(formatMoneyCLP(animatedAmount(amount ?: 0.0)), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = onContainer)
+        }
     }
 }
 

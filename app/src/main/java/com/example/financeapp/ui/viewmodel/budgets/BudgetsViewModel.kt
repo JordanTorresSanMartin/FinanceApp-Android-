@@ -53,6 +53,11 @@ class BudgetsViewModel @Inject constructor(
     private var loadJob: Job? = null
 
     /** Refresca sin vaciar la lista: así guardar un monto no pierde scroll ni foco. */
+    private val reload = com.example.financeapp.util.ReloadThrottle()
+
+    /** Al volver a la pantalla: recarga solo si pasaron 30 s o la app cambió datos. */
+    fun loadIfStale() { if (reload.ready()) load() }
+
     fun load() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {

@@ -59,6 +59,11 @@ class AnalyticsViewModel @Inject constructor(
 
     private var loadJob: Job? = null
 
+    private val reload = com.example.financeapp.util.ReloadThrottle()
+
+    /** Al volver a la pantalla: recarga solo si pasaron 30 s o la app cambió datos. */
+    fun loadIfStale() { if (reload.ready()) load() }
+
     fun load() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {

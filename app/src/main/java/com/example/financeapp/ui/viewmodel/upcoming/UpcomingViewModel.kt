@@ -1,6 +1,7 @@
 package com.example.financeapp.ui.viewmodel.upcoming
 
 import com.example.financeapp.util.friendlyError
+import com.example.financeapp.data.local.ClosedCardsStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.data.model.ForecastMonth
@@ -18,6 +19,8 @@ import javax.inject.Inject
 data class UpcomingUiState(
     val isLoading: Boolean = true,
     val statements: List<Statement> = emptyList(),
+    /** Tarjetas cerradas por el usuario (ocultas de totales y listas; se pueden reabrir). */
+    val closedCards: List<Statement> = emptyList(),
     val installments: List<Installment> = emptyList(),
     val monthlyTotal: Double = 0.0,
     val billedTotal: Double = 0.0,
@@ -31,7 +34,8 @@ data class UpcomingUiState(
 
 @HiltViewModel
 class UpcomingViewModel @Inject constructor(
-    private val repository: FinanceRepository
+    private val repository: FinanceRepository,
+    private val closedCards: ClosedCardsStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UpcomingUiState())
@@ -54,7 +58,8 @@ class UpcomingViewModel @Inject constructor(
                     val key = s.bank ?: "banco"
                     if (!latestByBank.containsKey(key)) latestByBank[key] = s
                 }
-                val latest = latestByBank.values.toList()
+                val closed = closedCards.closed()
+                val (closedList, latest) = latestByBank.values.partition { ClosedCardsStore.keyOf(it.bank, it.cardLast4) in closed }
 
                 val installments = if (latest.isEmpty()) emptyList() else {
                     repository.getInstallments(latest.map { it.id })
@@ -73,6 +78,7 @@ class UpcomingViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     statements = latest,
+                    closedCards = closedList,
                     installments = installments,
                     monthlyTotal = installments.sumOf { it.monthlyAmount },
                     billedTotal = latest.sumOf { it.totalAmount },
@@ -83,6 +89,12 @@ class UpcomingViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = false, message = friendlyError(e))
             }
         }
+    }
+
+    /** Cerrar (o reabrir) una tarjeta: sus cuotas dejan de contar en totales, gráfico y lista. */
+    fun setCardClosed(statement: Statement, closed: Boolean) {
+        closedCards.setClosed(ClosedCardsStore.keyOf(statement.bank, statement.cardLast4), closed)
+        load()
     }
 
     fun uploadPdf(base64: String, filename: String) = processPdf(base64, filename, null)

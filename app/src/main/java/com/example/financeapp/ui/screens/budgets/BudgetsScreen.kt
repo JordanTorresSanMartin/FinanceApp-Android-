@@ -69,7 +69,7 @@ fun BudgetsScreen(
     viewModel: BudgetsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
     val finance = FinanceTheme.colors
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -100,7 +100,7 @@ fun BudgetsScreen(
             Column(Modifier.weight(1f)) {
                 Text("PRESUPUESTO TOTAL", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f))
                 Text(
-                    if (state.isLoading) "—" else formatMoneyCLP(state.totalBudget),
+                    if (state.isLoading) "—" else formatMoneyCLP(com.example.financeapp.ui.components.animatedAmount(state.totalBudget)),
                     style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
@@ -108,47 +108,49 @@ fun BudgetsScreen(
             Column(Modifier.weight(1f).padding(start = 16.dp)) {
                 Text("DISPONIBLE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f))
                 Text(
-                    if (state.isLoading) "—" else formatMoneyCLP(state.totalAvailable),
+                    if (state.isLoading) "—" else formatMoneyCLP(com.example.financeapp.ui.components.animatedAmount(state.totalAvailable)),
                     style = MaterialTheme.typography.headlineSmall,
                     color = if (state.totalAvailable < 0) finance.expense else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
         }
 
-        if (state.isLoading) {
-            com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-                com.example.financeapp.ui.components.SkeletonCardList(rows = 6)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().imePadding(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                state.error?.let { err ->
+        com.example.financeapp.ui.components.FadeThrough(state.isLoading, Modifier.fillMaxSize()) { loading ->
+            if (loading) {
+                com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    com.example.financeapp.ui.components.SkeletonCardList(rows = 6)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().imePadding(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    state.error?.let { err ->
+                        item {
+                            Text(
+                                err,
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.errorContainer).padding(12.dp),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
                     item {
-                        Text(
-                            err,
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.errorContainer).padding(12.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodyMedium,
+                        AlertBanner(
+                            items = state.items.map {
+                                BudgetAlertItem(it.categoryId, it.categoryName, it.budgetAmount, it.spent)
+                            },
                         )
                     }
-                }
-                item {
-                    AlertBanner(
-                        items = state.items.map {
-                            BudgetAlertItem(it.categoryId, it.categoryName, it.budgetAmount, it.spent)
-                        },
-                    )
-                }
-                items(state.items, key = { it.categoryId }) { item ->
-                    BudgetItemCard(
-                        item = item,
-                        saving = state.savingId == item.categoryId,
-                        onSave = { amount -> viewModel.updateBudgetAmount(item.categoryId, amount) },
-                    )
+                    items(state.items, key = { it.categoryId }) { item ->
+                        BudgetItemCard(
+                            item = item,
+                            saving = state.savingId == item.categoryId,
+                            onSave = { amount -> viewModel.updateBudgetAmount(item.categoryId, amount) },
+                        )
+                    }
                 }
             }
         }

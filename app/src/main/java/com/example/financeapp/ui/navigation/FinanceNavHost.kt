@@ -1,5 +1,7 @@
 package com.example.financeapp.ui.navigation
 
+import com.example.financeapp.ui.components.EmphasizedDecelerate
+
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -72,10 +74,11 @@ fun FinanceNavHost(
     NavHost(
         navController = nav,
         startDestination = if (startInMain) NavRoute.MainGraph else NavRoute.AuthGraph,
-        enterTransition = { fadeIn(tween(350)) + slideInHorizontally(tween(350)) { it / 4 } },
-        exitTransition = { fadeOut(tween(350)) + slideOutHorizontally(tween(350)) { -it / 4 } },
-        popEnterTransition = { fadeIn(tween(350)) },
-        popExitTransition = { fadeOut(tween(350)) + slideOutHorizontally(tween(350)) { it / 4 } },
+        // Material 3 "shared axis X" con curva emphasized: entra rápido y se asienta suave.
+        enterTransition = { fadeIn(tween(300, easing = EmphasizedDecelerate)) + slideInHorizontally(tween(400, easing = EmphasizedDecelerate)) { it / 5 } },
+        exitTransition = { fadeOut(tween(150)) + slideOutHorizontally(tween(300)) { -it / 10 } },
+        popEnterTransition = { fadeIn(tween(300, easing = EmphasizedDecelerate)) + slideInHorizontally(tween(400, easing = EmphasizedDecelerate)) { -it / 10 } },
+        popExitTransition = { fadeOut(tween(150)) + slideOutHorizontally(tween(300)) { it / 5 } },
     ) {
         navigation<NavRoute.AuthGraph>(startDestination = NavRoute.Login) {
             composable<NavRoute.Login> { LoginScreen() }

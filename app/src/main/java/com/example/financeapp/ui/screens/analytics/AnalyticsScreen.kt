@@ -64,7 +64,7 @@ fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
 
     val selected = state.stats.firstOrNull { it.id == state.selectedId }
     val segments = state.stats.map {
@@ -90,49 +90,55 @@ fun AnalyticsScreen(
             }
         }
 
-        if (state.isLoading) {
-            com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-                com.example.financeapp.ui.components.SkeletonHero(height = 220.dp)
-                Spacer(Modifier.height(14.dp))
-                com.example.financeapp.ui.components.SkeletonCardList(rows = 5)
-            }
-            return@Column
-        }
-
-        LazyColumn(
+        com.example.financeapp.ui.components.LoadingContent(
+            loading = state.isLoading && state.stats.isEmpty(),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 40.dp),
-        ) {
-            // Donut card
-            item {
-                Column(
-                    modifier = Modifier.padding(20.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer).padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    CategoryDonut(
-                        data = segments,
-                        centerPrimary = if (selected != null) "${selected.pct.roundToInt()}%" else formatMoneyCLP(state.total),
-                        centerSecondary = selected?.name ?: "Gastado",
-                        selectedKey = state.selectedId,
-                        onSelect = viewModel::toggleSelected,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        if (selected != null) "Toca el sector de nuevo para volver al total" else "Toca un sector para ver el detalle",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                    )
+            skeleton = {
+                com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    com.example.financeapp.ui.components.SkeletonHero(height = 220.dp)
+                    Spacer(Modifier.height(14.dp))
+                    com.example.financeapp.ui.components.SkeletonCardList(rows = 5)
                 }
-            }
+            },
+        ) {
+            Column(Modifier.fillMaxSize()) {
 
-            if (selected != null) {
-                item { CategoryDetail(selected) }
-            } else if (state.stats.isEmpty()) {
-                item { EmptyAnalytics() }
-            } else {
-                items(state.stats, key = { it.id }) { stat ->
-                    LegendRow(stat) { viewModel.toggleSelected(stat.id) }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 40.dp),
+                ) {
+                    // Donut card
+                    item {
+                        Column(
+                            modifier = Modifier.padding(20.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer).padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            CategoryDonut(
+                                data = segments,
+                                centerPrimary = if (selected != null) "${selected.pct.roundToInt()}%" else formatMoneyCLP(state.total),
+                                centerSecondary = selected?.name ?: "Gastado",
+                                selectedKey = state.selectedId,
+                                onSelect = viewModel::toggleSelected,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                if (selected != null) "Toca el sector de nuevo para volver al total" else "Toca un sector para ver el detalle",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                            )
+                        }
+                    }
+
+                    if (selected != null) {
+                        item { CategoryDetail(selected) }
+                    } else if (state.stats.isEmpty()) {
+                        item { EmptyAnalytics() }
+                    } else {
+                        items(state.stats, key = { it.id }) { stat ->
+                            LegendRow(stat) { viewModel.toggleSelected(stat.id) }
+                        }
+                    }
                 }
             }
         }

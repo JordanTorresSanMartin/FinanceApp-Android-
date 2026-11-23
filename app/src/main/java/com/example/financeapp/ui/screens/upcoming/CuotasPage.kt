@@ -58,7 +58,7 @@ internal fun CuotasPage(
             Spacer(Modifier.height(8.dp))
         }
         if (plans.isEmpty() && loading) {
-            item(key = "skeleton") { SkeletonScope { SkeletonCardList(rows = 3) } }
+            item(key = "skeleton") { SkeletonScope(Modifier.animateItem()) { SkeletonCardList(rows = 3) } }
         } else if (plans.isEmpty()) {
             item(key = "empty") {
                 EmptyPage(

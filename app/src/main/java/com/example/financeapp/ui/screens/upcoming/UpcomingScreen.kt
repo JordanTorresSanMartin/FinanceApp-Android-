@@ -1,6 +1,8 @@
 package com.example.financeapp.ui.screens.upcoming
 
 import com.example.financeapp.ui.components.Bone
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.ui.draw.alpha
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
@@ -188,15 +190,17 @@ fun UpcomingScreen(
                 Text("Próximos pagos", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
-            if (recurring.isLoading || (cuotasLoading && plans.isEmpty())) SkeletonScope(Modifier.padding(horizontal = 20.dp)) { SkeletonHero(height = 128.dp) }
-            else MonthOverview(
+            com.example.financeapp.ui.components.LoadingContent(
+                loading = recurring.isLoading || (cuotasLoading && plans.isEmpty()),
+                skeleton = { SkeletonScope(Modifier.padding(horizontal = 20.dp)) { SkeletonHero(height = 128.dp) } },
+            ) { MonthOverview(
                 pending = pendingCuotasAmount + recurring.pendingAmount,
                 cuotas = pendingCuotasAmount,
                 fijos = recurring.pendingAmount,
                 done = doneItems,
                 total = totalItems,
                 modifier = Modifier.padding(horizontal = 20.dp),
-            )
+            ) }
 
             Spacer(Modifier.height(8.dp))
             PrimaryTabRow(
@@ -264,7 +268,7 @@ fun UpcomingScreen(
                         onEdit = { editingItem = it; editorOpen = true },
                         onRegister = { haptics?.success(); recurringVm.registerPayment(it) },
                     )
-                    UpcomingTab.TARJETAS -> TarjetasPage(state, today, pageInsets, onUpload = pickPdf)
+                    UpcomingTab.TARJETAS -> TarjetasPage(state, today, pageInsets, onUpload = pickPdf, onSetClosed = viewModel::setCardClosed)
                 }
             }
         }
@@ -316,7 +320,7 @@ private fun MonthOverview(pending: Double, cuotas: Double, fijos: Double, done: 
             style = MaterialTheme.typography.labelLarge, color = onC.copy(alpha = 0.85f),
         )
         if (pending > 0) {
-            AnimatedMoney(pending, MaterialTheme.typography.headlineLarge, onC)
+            Text(money(com.example.financeapp.ui.components.animatedAmount(pending)), style = MaterialTheme.typography.headlineLarge, color = onC, fontWeight = FontWeight.Black)
         } else {
             Text("Todo al día ✓", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black, color = onC)
         }
@@ -336,25 +340,32 @@ private fun MonthOverview(pending: Double, cuotas: Double, fijos: Double, done: 
     }
 }
 
-/** Pestaña "Tarjetas": lo que detectamos en tus estados de cuenta (solo lectura). */
+/** Pestaña "Tarjetas": lo que detectamos en tus estados de cuenta; cada tarjeta se puede cerrar o reabrir. */
 @Composable
-private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, contentPadding: PaddingValues, onUpload: () -> Unit) {
+private fun TarjetasPage(
+    state: UpcomingUiState,
+    today: java.time.LocalDate,
+    contentPadding: PaddingValues,
+    onUpload: () -> Unit,
+    onSetClosed: (com.example.financeapp.data.model.Statement, Boolean) -> Unit,
+) {
     val finance = FinanceTheme.colors
+    var confirmClose by remember { mutableStateOf<com.example.financeapp.data.model.Statement?>(null) }
+    val perCard = remember(state.installments) { state.installments.groupBy { it.statementId } }
     val dueJava = state.nextDue?.let { runCatching { java.time.LocalDate.parse(it.toString()) }.getOrNull() }
     val stale = dueJava != null && dueJava.isBefore(today.minusDays(7))
-    val source = state.statements.joinToString(" · ") { bankShort(it.bank) + (it.cardLast4?.let { l -> " ••$l" } ?: "") }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item(key = "intro") {
             PageIntro(
                 if (state.statements.isEmpty()) "Cuotas que vienen en el estado de cuenta de tu tarjeta."
-                else "Del estado de cuenta: $source. Solo lectura.",
+                else "Cuotas que vienen en el estado de cuenta de tus tarjetas.",
             ) { if (state.statements.isNotEmpty()) UploadPill(state.uploading, onUpload) }
             Spacer(Modifier.height(8.dp))
         }
         if (state.isLoading) {
             item(key = "loading") {
-                SkeletonScope {
+                SkeletonScope(Modifier.animateItem()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         repeat(3) { Bone(Modifier.weight(1f).height(64.dp), RoundedCornerShape(20.dp)) }
                     }
@@ -366,7 +377,20 @@ private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, con
             }
             return@LazyColumn
         }
-        if (state.statements.isEmpty()) {
+        if (state.statements.isNotEmpty()) {
+            item(key = "cards-title") { SectionLabel("Tus tarjetas", Modifier.animateItem()) }
+            itemsIndexed(state.statements, key = { _, s -> "card-" + s.id }) { i, s ->
+                val list = perCard[s.id].orEmpty()
+                CardRow(
+                    s, i, state.statements.size, Modifier.animateItem(),
+                    subtitle = "${list.size} compras · ${money(list.sumOf { it.monthlyAmount })}/mes" +
+                        (s.dueDate?.let { " · vence ${shortDateLabel(it)}" } ?: ""),
+                    actionLabel = "Cerrar", onAction = { confirmClose = s },
+                )
+            }
+            item(key = "cards-gap") { Spacer(Modifier.height(16.dp)) }
+        }
+        if (state.statements.isEmpty() && state.closedCards.isEmpty()) {
             item(key = "empty") {
                 EmptyPage(
                     Icons.Filled.CloudUpload, "Sube tu estado de cuenta",
@@ -375,7 +399,12 @@ private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, con
             }
             return@LazyColumn
         }
-        if (stale) {
+        if (state.statements.isEmpty()) {
+            item(key = "all-closed") {
+                PageIntro("Todas tus tarjetas están cerradas. Reabre una o sube un estado de cuenta nuevo.") { UploadPill(state.uploading, onUpload) }
+            }
+        }
+        if (stale && state.statements.isNotEmpty()) {
             item(key = "stale") {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(20.dp))
@@ -390,7 +419,7 @@ private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, con
                 }
             }
         }
-        item(key = "stats") {
+        if (state.statements.isNotEmpty()) item(key = "stats") {
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatTile("Cuotas al mes", money(state.monthlyTotal), Modifier.weight(1f))
                 StatTile("Facturado", money(state.billedTotal), Modifier.weight(1f))
@@ -400,7 +429,7 @@ private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, con
         if (state.forecast.isNotEmpty()) {
             item(key = "forecast") { ForecastChart(state, Modifier.padding(bottom = 16.dp)) }
         }
-        item(key = "list-title") {
+        if (state.installments.isNotEmpty()) item(key = "list-title") {
             Text(
                 "${state.installments.size} compras en cuotas", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
@@ -409,6 +438,61 @@ private fun TarjetasPage(state: UpcomingUiState, today: java.time.LocalDate, con
         itemsIndexed(state.installments, key = { _, it -> it.id }) { i, inst ->
             BankInstallmentRow(inst, i, state.installments.size, Modifier.animateItem())
         }
+        if (state.closedCards.isNotEmpty()) {
+            item(key = "closed-title") { SectionLabel("Cerradas", Modifier.animateItem().padding(top = 16.dp)) }
+            itemsIndexed(state.closedCards, key = { _, s -> "closed-" + s.id }) { i, s ->
+                CardRow(
+                    s, i, state.closedCards.size, Modifier.animateItem(),
+                    subtitle = "No cuenta en totales ni en la lista", actionLabel = "Reabrir",
+                    dimmed = true, onAction = { onSetClosed(s, false) },
+                )
+            }
+        }
+    }
+
+    confirmClose?.let { s ->
+        val n = perCard[s.id].orEmpty().size
+        AlertDialog(
+            onDismissRequest = { confirmClose = null },
+            title = { Text("¿Cerrar ${cardName(s)}?") },
+            text = { Text("Sus $n compras en cuotas dejarán de contar en totales, gráfico y lista. No se borra nada: puedes reabrirla cuando quieras.") },
+            confirmButton = { TextButton(onClick = { onSetClosed(s, true); confirmClose = null }) { Text("Cerrar tarjeta") } },
+            dismissButton = { TextButton(onClick = { confirmClose = null }) { Text("Cancelar") } },
+        )
+    }
+}
+
+private fun cardName(s: com.example.financeapp.data.model.Statement) = bankShort(s.bank) + (s.cardLast4?.let { " ••$it" } ?: "")
+
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(start = 4.dp, bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun CardRow(
+    s: com.example.financeapp.data.model.Statement,
+    index: Int,
+    count: Int,
+    modifier: Modifier,
+    subtitle: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    dimmed: Boolean = false,
+) {
+    GroupRow(index, count, modifier.alpha(if (dimmed) 0.6f else 1f)) {
+        com.example.financeapp.ui.components.CategoryAvatar(
+            icon = Icons.Filled.CreditCard, color = MaterialTheme.colorScheme.primary, size = 40.dp, corner = 14.dp,
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(cardName(s), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        TextButton(onClick = onAction) { Text(actionLabel, fontWeight = FontWeight.SemiBold) }
     }
 }
 

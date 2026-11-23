@@ -52,7 +52,7 @@ fun AnnualSummaryScreen(
     viewModel: AnnualSummaryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
     val finance = FinanceTheme.colors
 
     val fullYear = (1..12).map { m ->
@@ -78,115 +78,121 @@ fun AnnualSummaryScreen(
             RoundIconButton(Icons.Filled.ChevronRight, viewModel::nextYear, "Año siguiente")
         }
 
-        if (state.isLoading) {
-            com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-                com.example.financeapp.ui.components.SkeletonHero()
-                Spacer(Modifier.height(14.dp))
-                com.example.financeapp.ui.components.SkeletonChart(bars = 6)
-                Spacer(Modifier.height(14.dp))
-                com.example.financeapp.ui.components.SkeletonCardList(rows = 4)
-            }
-            return@Column
-        }
-
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        com.example.financeapp.ui.components.LoadingContent(
+            loading = state.isLoading && state.summaries.isEmpty(),
+            modifier = Modifier.fillMaxSize(),
+            skeleton = {
+                com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    com.example.financeapp.ui.components.SkeletonHero()
+                    Spacer(Modifier.height(14.dp))
+                    com.example.financeapp.ui.components.SkeletonChart(bars = 6)
+                    Spacer(Modifier.height(14.dp))
+                    com.example.financeapp.ui.components.SkeletonCardList(rows = 4)
+                }
+            },
         ) {
-            // Hero anual
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer).padding(24.dp),
-            ) {
-                Text("Balance neto anual", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f))
-                Text(
-                    formatMoneyCLP(yearBalance),
-                    style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black,
-                    color = if (yearBalance >= 0) MaterialTheme.colorScheme.onPrimaryContainer else finance.expense,
-                )
-                Spacer(Modifier.height(18.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    Column {
-                        Text("INGRESOS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
-                        Text("+${formatMoneyCLP(yearIncome)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                    Column {
-                        Text("GASTOS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
-                        Text("-${formatMoneyCLP(yearExpense)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                }
-            }
+            Column(Modifier.fillMaxSize()) {
 
-            // Bar chart
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow).padding(20.dp),
-            ) {
-                Text("Ingresos vs gastos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    fullYear.forEach { s ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Row(
-                                modifier = Modifier.height(140.dp).width(40.dp),
-                                verticalAlignment = Alignment.Bottom,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Bar(fraction = (s.totalIncome ?: 0.0) / maxVal, color = finance.income)
-                                Bar(fraction = (s.totalExpenses ?: 0.0) / maxVal, color = finance.expense)
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Text(monthShortLabel(s.month ?: 1), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    Legend("Ingresos", finance.income)
-                    Spacer(Modifier.width(20.dp))
-                    Legend("Gastos", finance.expense)
-                }
-            }
-
-            // Monthly table
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(14.dp),
+                Column(
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Th("Mes", 0.8f)
-                    Th("Ingresos", 1f)
-                    Th("Gastos", 1f)
-                    Th("Bal.", 0.8f)
-                }
-                fullYear.forEach { s ->
-                    val hasData = (s.totalIncome ?: 0.0) > 0 || (s.totalExpenses ?: 0.0) > 0
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    // Hero anual
+                    Column(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer).padding(24.dp),
                     ) {
-                        Text(monthShortLabel(s.month ?: 1), modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        if (hasData) {
-                            Td(formatMoneyCLP(s.totalIncome ?: 0.0), 1f, MaterialTheme.colorScheme.onSurface)
-                            Td(formatMoneyCLP(s.totalExpenses ?: 0.0), 1f, MaterialTheme.colorScheme.onSurface)
-                            val bal = s.balance ?: 0.0
-                            Td(
-                                (if (bal > 0) "+" else "") + "${(bal / 1000).roundToInt()}k",
-                                0.8f, if (bal >= 0) finance.income else finance.expense,
-                            )
-                        } else {
-                            Text(
-                                "Sin movimientos", modifier = Modifier.weight(2.8f),
-                                style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Text("Balance neto anual", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f))
+                        Text(
+                            formatMoneyCLP(yearBalance),
+                            style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black,
+                            color = if (yearBalance >= 0) MaterialTheme.colorScheme.onPrimaryContainer else finance.expense,
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            Column {
+                                Text("INGRESOS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                                Text("+${formatMoneyCLP(yearIncome)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                            Column {
+                                Text("GASTOS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                                Text("-${formatMoneyCLP(yearExpense)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
                         }
                     }
+
+                    // Bar chart
+                    Column(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow).padding(20.dp),
+                    ) {
+                        Text("Ingresos vs gastos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(20.dp))
+                        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            fullYear.forEach { s ->
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Row(
+                                        modifier = Modifier.height(140.dp).width(40.dp),
+                                        verticalAlignment = Alignment.Bottom,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Bar(fraction = (s.totalIncome ?: 0.0) / maxVal, color = finance.income)
+                                        Bar(fraction = (s.totalExpenses ?: 0.0) / maxVal, color = finance.expense)
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(monthShortLabel(s.month ?: 1), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                            Legend("Ingresos", finance.income)
+                            Spacer(Modifier.width(20.dp))
+                            Legend("Gastos", finance.expense)
+                        }
+                    }
+
+                    // Monthly table
+                    Column(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(14.dp),
+                        ) {
+                            Th("Mes", 0.8f)
+                            Th("Ingresos", 1f)
+                            Th("Gastos", 1f)
+                            Th("Bal.", 0.8f)
+                        }
+                        fullYear.forEach { s ->
+                            val hasData = (s.totalIncome ?: 0.0) > 0 || (s.totalExpenses ?: 0.0) > 0
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(monthShortLabel(s.month ?: 1), modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                if (hasData) {
+                                    Td(formatMoneyCLP(s.totalIncome ?: 0.0), 1f, MaterialTheme.colorScheme.onSurface)
+                                    Td(formatMoneyCLP(s.totalExpenses ?: 0.0), 1f, MaterialTheme.colorScheme.onSurface)
+                                    val bal = s.balance ?: 0.0
+                                    Td(
+                                        (if (bal > 0) "+" else "") + "${(bal / 1000).roundToInt()}k",
+                                        0.8f, if (bal >= 0) finance.income else finance.expense,
+                                    )
+                                } else {
+                                    Text(
+                                        "Sin movimientos", modifier = Modifier.weight(2.8f),
+                                        style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
                 }
             }
-            Spacer(Modifier.height(20.dp))
         }
     }
 }

@@ -44,6 +44,11 @@ class DashboardViewModel @Inject constructor(
     private var loadJob: Job? = null
 
     /** [userRefresh] = pull-to-refresh: muestra el indicador sin vaciar la pantalla. */
+    private val reload = com.example.financeapp.util.ReloadThrottle()
+
+    /** Al volver a la pantalla: recarga solo si pasaron 30 s o la app cambió datos. */
+    fun loadIfStale() { if (reload.ready()) load() }
+
     fun load(userRefresh: Boolean = false) {
         loadJob?.cancel() // la respuesta de un mes anterior nunca pisa al actual
         loadJob = viewModelScope.launch {

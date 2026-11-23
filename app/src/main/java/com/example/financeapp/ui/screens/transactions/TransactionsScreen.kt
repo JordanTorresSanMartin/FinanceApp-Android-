@@ -82,7 +82,7 @@ fun TransactionsScreen(
     viewModel: TransactionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
     val finance = FinanceTheme.colors
     val focusManager = LocalFocusManager.current
 
@@ -169,45 +169,52 @@ fun TransactionsScreen(
             onRefresh = { viewModel.load(userRefresh = true) },
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
-            if (state.isLoading && state.transactions.isEmpty()) {
-                com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-                    com.example.financeapp.ui.components.SkeletonCardList(rows = 8)
-                }
-            } else if (state.filteredTransactions.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(40.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.ReceiptLong, null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(56.dp),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Text(if (state.isFiltering) "Sin resultados" else "Sin transacciones", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        if (state.isFiltering) "Ningún movimiento coincide con la búsqueda o el filtro" else "No hay movimientos este mes",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp,
-                    ),
-                ) {
-                    grouped.forEach { (date, items) ->
-                        val dayTotal = items.sumOf { if (it.type == TxType.INGRESO) it.amount else -it.amount }
-                        item(key = "h-$date") {
-                            DayHeader(label = dayHeaderLabel(date), total = dayTotal)
-                        }
-                        items.forEachIndexed { idx, tx ->
-                            item(key = tx.id ?: (tx.description + date + idx)) {
-                                TransactionRow(tx, shape = groupedItemShape(idx, items.size)) {
-                                    tx.id?.let(onNavigateToEditTransaction)
+            val phase = when {
+                state.isLoading && state.transactions.isEmpty() -> 0
+                state.filteredTransactions.isEmpty() -> 1
+                else -> 2
+            }
+            com.example.financeapp.ui.components.FadeThrough(phase, Modifier.fillMaxSize()) { phase ->
+                if (phase == 0) {
+                    com.example.financeapp.ui.components.SkeletonScope(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                        com.example.financeapp.ui.components.SkeletonCardList(rows = 8)
+                    }
+                } else if (phase == 1) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.ReceiptLong, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(56.dp),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(if (state.isFiltering) "Sin resultados" else "Sin transacciones", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            if (state.isFiltering) "Ningún movimiento coincide con la búsqueda o el filtro" else "No hay movimientos este mes",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp,
+                        ),
+                    ) {
+                        grouped.forEach { (date, items) ->
+                            val dayTotal = items.sumOf { if (it.type == TxType.INGRESO) it.amount else -it.amount }
+                            item(key = "h-$date") {
+                                DayHeader(label = dayHeaderLabel(date), total = dayTotal)
+                            }
+                            items.forEachIndexed { idx, tx ->
+                                item(key = tx.id ?: (tx.description + date + idx)) {
+                                    TransactionRow(tx, shape = groupedItemShape(idx, items.size)) {
+                                        tx.id?.let(onNavigateToEditTransaction)
+                                    }
                                 }
                             }
                         }

@@ -190,16 +190,3 @@ internal fun PayButton(done: Boolean, onClick: () -> Unit, label: String, busy: 
         }
     }
 }
-
-/** Monto grande que cambia deslizando hacia arriba (baja) o abajo (sube). */
-@Composable
-internal fun AnimatedMoney(value: Double, style: androidx.compose.ui.text.TextStyle, color: Color) {
-    AnimatedContent(
-        targetState = value,
-        transitionSpec = {
-            val up = targetState < initialState
-            (slideInVertically { if (up) it else -it } + fadeIn()).togetherWith(slideOutVertically { if (up) -it else it } + fadeOut())
-        },
-        label = "money",
-    ) { v -> Text(money(v), style = style, color = color, fontWeight = FontWeight.Black) }
-}

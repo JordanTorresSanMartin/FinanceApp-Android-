@@ -4,6 +4,7 @@ import com.example.financeapp.data.model.*
 import com.example.financeapp.domain.RECURRING_NOTE
 import com.example.financeapp.domain.repository.FinanceRepository
 import com.example.financeapp.util.toJavaLocalDate
+import com.example.financeapp.util.DataVersion
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
@@ -98,6 +99,7 @@ class FinanceRepositoryImpl @Inject constructor(
         }
 
     override suspend fun upsertBudget(categoryId: String, year: Int, month: Int, amount: Double) {
+        DataVersion.bump()
         withContext(Dispatchers.IO) {
             val userId = requireUserId()
             postgrest["budgets"].upsert(
@@ -140,6 +142,7 @@ class FinanceRepositoryImpl @Inject constructor(
         date: LocalDate, description: String, categoryId: String?,
         type: String, amount: Double, notes: String?,
     ) {
+        DataVersion.bump()
         withContext(Dispatchers.IO) {
             val userId = requireUserId()
             postgrest["transactions"].insert(
@@ -160,6 +163,7 @@ class FinanceRepositoryImpl @Inject constructor(
         id: String, date: LocalDate, description: String, categoryId: String?,
         type: String, amount: Double, notes: String?,
     ) {
+        DataVersion.bump()
         withContext(Dispatchers.IO) {
             postgrest["transactions"].update(
                 buildJsonObject {
@@ -175,6 +179,7 @@ class FinanceRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteTransaction(id: String) {
+        DataVersion.bump()
         withContext(Dispatchers.IO) {
             postgrest["transactions"].delete { filter { eq("id", id) } }
         }
@@ -249,6 +254,7 @@ class FinanceRepositoryImpl @Inject constructor(
         id: String?, name: String, amount: Double, categoryId: String?,
         frequency: String, billingDay: Int?, notes: String?,
     ) {
+        DataVersion.bump()
         withContext(Dispatchers.IO) {
             val userId = requireUserId()
             postgrest["recurring_payments"].upsert(
@@ -268,6 +274,7 @@ class FinanceRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteRecurringPayment(id: String) {
+        DataVersion.bump()
         withContext(Dispatchers.IO) {
             postgrest["recurring_payments"].delete { filter { eq("id", id) } }
         }

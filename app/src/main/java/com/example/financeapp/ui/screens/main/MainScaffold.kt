@@ -1,5 +1,10 @@
 package com.example.financeapp.ui.screens.main
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -100,6 +105,11 @@ fun MainScaffold(
             navController = navController,
             startDestination = NavRoute.Dashboard,
             modifier = Modifier.padding(innerPadding),
+            // Material "fade through" para pestañas: sale rápido, entra con fundido y leve escala.
+            enterTransition = { fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.96f) },
+            exitTransition = { fadeOut(tween(90)) },
+            popEnterTransition = { fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.96f) },
+            popExitTransition = { fadeOut(tween(90)) },
         ) {
             composable<NavRoute.Dashboard> {
                 DashboardScreen(
