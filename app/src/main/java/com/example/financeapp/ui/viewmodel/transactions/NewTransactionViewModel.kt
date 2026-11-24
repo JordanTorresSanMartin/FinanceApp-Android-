@@ -21,6 +21,8 @@ data class NewTransactionUiState(
     val type: String = TxType.GASTO,    // "gasto" | "ingreso"
     val dateText: String = todayLocalDate().toString(), // ISO YYYY-MM-DD
     val selectedCategoryId: String? = null,
+    /** La categoría seleccionada la sugirió la app (según anotaciones anteriores). */
+    val suggested: Boolean = false,
     val notes: String = "",
     val categories: List<Category> = emptyList(),
     val loadingCategories: Boolean = true,
@@ -57,6 +59,7 @@ class NewTransactionViewModel @Inject constructor(
             try {
                 val cats = repository.getCategories()
                 _uiState.value = _uiState.value.copy(categories = cats, loadingCategories = false)
+                history = runCatching { repository.getCategoryHistory() }.getOrDefault(emptyMap())
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(loadingCategories = false, error = "Error al cargar categorías")
             }
@@ -67,9 +70,22 @@ class NewTransactionViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(amount = raw.filter { it.isDigit() })
     }
 
-    fun onDescriptionChange(value: String) { _uiState.value = _uiState.value.copy(description = value) }
-    fun onTypeChange(type: String) { _uiState.value = _uiState.value.copy(type = type, selectedCategoryId = null) }
-    fun onCategorySelected(id: String) { _uiState.value = _uiState.value.copy(selectedCategoryId = id) }
+    /** Descripción → categoría de anotaciones anteriores. Mientras el usuario no elija a mano, se sugiere sola. */
+    private var history: Map<String, String> = emptyMap()
+    private var manualCategory = false
+
+    fun onDescriptionChange(value: String) {
+        val s = _uiState.value
+        val suggestion = if (manualCategory) null else com.example.financeapp.domain.suggestCategory(history, value)
+            ?.takeIf { id -> s.categories.any { it.id == id && (it.type == s.type || it.type == "ambos") } }
+        _uiState.value = s.copy(
+            description = value,
+            selectedCategoryId = if (manualCategory) s.selectedCategoryId else suggestion ?: s.selectedCategoryId.takeIf { s.suggested.not() },
+            suggested = !manualCategory && suggestion != null,
+        )
+    }
+    fun onTypeChange(type: String) { manualCategory = false; _uiState.value = _uiState.value.copy(type = type, selectedCategoryId = null, suggested = false) }
+    fun onCategorySelected(id: String) { manualCategory = true; _uiState.value = _uiState.value.copy(selectedCategoryId = id, suggested = false) }
     fun onNotesChange(value: String) { _uiState.value = _uiState.value.copy(notes = value) }
     fun onDateChange(iso: String) { _uiState.value = _uiState.value.copy(dateText = iso) }
     fun setToday() { _uiState.value = _uiState.value.copy(dateText = todayLocalDate().toString()) }

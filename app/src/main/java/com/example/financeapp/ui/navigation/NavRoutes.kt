@@ -9,8 +9,10 @@ sealed interface NavRoute {
 
     @Serializable data object Dashboard : NavRoute
     @Serializable data object Transactions : NavRoute
-    @Serializable data object Budgets : NavRoute
-    @Serializable data object AnnualSummary : NavRoute
+    /** Pestaña "Pagos": cuotas, pagos fijos y tarjetas. */
+    @Serializable data object Payments : NavRoute
+    /** Pestaña "Análisis": por categoría, presupuesto y anual. */
+    @Serializable data object AnalysisHub : NavRoute
     @Serializable data object Profile : NavRoute
 
     @Serializable data class NewTransaction(val type: String = "gasto") : NavRoute

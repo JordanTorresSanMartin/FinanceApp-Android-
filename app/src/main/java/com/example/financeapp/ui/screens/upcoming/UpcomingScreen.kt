@@ -117,6 +117,8 @@ private enum class UpcomingTab(val title: String) { CUOTAS("Cuotas"), FIJOS("Fij
 @Composable
 fun UpcomingScreen(
     onBack: () -> Unit,
+    /** false como pestaña "Pagos" (no hay a dónde volver). */
+    showBack: Boolean = true,
     viewModel: UpcomingViewModel = hiltViewModel(),
     recurringVm: RecurringViewModel = hiltViewModel(),
     cuotasVm: InstallmentsViewModel = hiltViewModel(),
@@ -189,9 +191,11 @@ fun UpcomingScreen(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, "Volver", size = 40.dp)
-                Spacer(Modifier.width(16.dp))
-                Text("Próximos pagos", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                if (showBack) {
+                    RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, "Volver", size = 40.dp)
+                    Spacer(Modifier.width(16.dp))
+                }
+                Text(if (showBack) "Próximos pagos" else "Pagos", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
             com.example.financeapp.ui.components.LoadingContent(

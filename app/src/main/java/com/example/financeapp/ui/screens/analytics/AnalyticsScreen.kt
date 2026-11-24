@@ -61,6 +61,8 @@ import kotlin.math.roundToInt
 @Composable
 fun AnalyticsScreen(
     onBack: () -> Unit,
+    /** false dentro de la pestaña Análisis (no hay a dónde volver). */
+    showBack: Boolean = true,
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -79,7 +81,7 @@ fun AnalyticsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, "Volver", size = 40.dp)
+            if (showBack) RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, onBack, "Volver", size = 40.dp) else Spacer(Modifier.width(40.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("ANÁLISIS POR CATEGORÍA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(monthYearLabel(state.currentYear, state.currentMonth), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

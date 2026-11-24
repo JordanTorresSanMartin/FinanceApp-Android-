@@ -82,6 +82,8 @@ fun TransactionFormBody(
     onYesterday: () -> Unit,
     categories: List<Category>,
     selectedCategoryId: String?,
+    /** true si la categoría la sugirió la app según anotaciones anteriores. */
+    categorySuggested: Boolean = false,
     onCategorySelected: (String) -> Unit,
     notes: String,
     onNotesChange: (String) -> Unit,
@@ -207,7 +209,13 @@ fun TransactionFormBody(
         }
 
         // Categories
-        Text("Categoría", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Categoría", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (categorySuggested) Text(
+                "  · sugerida por tus anotaciones", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         if (filtered.isEmpty()) {
             Text(
                 "No hay categorías disponibles.",

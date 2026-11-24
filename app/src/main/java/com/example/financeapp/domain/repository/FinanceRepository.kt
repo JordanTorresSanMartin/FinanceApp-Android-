@@ -18,6 +18,14 @@ interface FinanceRepository {
 
     // Categorías / transacciones
     suspend fun getCategories(): List<Category>
+    /** Gasto por pagar la cuota [n]/[total] de una compra en cuotas propia. */
+    suspend fun registerInstallmentExpense(name: String, n: Int, total: Int, amount: Double, date: LocalDate)
+    /** Borra el gasto de la última cuota pagada de [name] (al deshacer). */
+    suspend fun undoInstallmentExpense(name: String)
+    /** Crea (id = null) o edita una categoría. */
+    suspend fun saveCategory(id: String?, name: String, type: String, icon: String?, color: String?)
+    /** Descripción normalizada → categoría más reciente (para sugerir al anotar). */
+    suspend fun getCategoryHistory(): Map<String, String>
     suspend fun getTransactionsByMonth(year: Int, month: Int): List<Transaction>
     suspend fun getTransactionById(id: String): Transaction?
     suspend fun insertTransaction(

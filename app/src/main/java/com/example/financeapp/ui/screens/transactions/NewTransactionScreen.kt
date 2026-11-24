@@ -98,6 +98,7 @@ fun NewTransactionScreen(
                     onYesterday = viewModel::setYesterday,
                     categories = state.categories,
                     selectedCategoryId = state.selectedCategoryId,
+                    categorySuggested = state.suggested,
                     onCategorySelected = viewModel::onCategorySelected,
                     notes = state.notes,
                     onNotesChange = viewModel::onNotesChange,

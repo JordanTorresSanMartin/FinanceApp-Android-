@@ -11,6 +11,9 @@ import java.time.temporal.TemporalAdjusters
 /** Nota con la que se marcan las transacciones creadas desde un pago fijo. */
 const val RECURRING_NOTE = "Pago recurrente"
 
+/** Nota de las transacciones creadas al pagar una cuota propia ("Mis cuotas"). */
+const val INSTALLMENT_NOTE = "Pago de cuota"
+
 /** El orden importa: es el orden de urgencia en listas y widget. */
 enum class PayState { ATRASADO, POR_VENCER, PENDIENTE, PAGADO }
 

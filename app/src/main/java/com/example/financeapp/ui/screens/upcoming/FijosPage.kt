@@ -52,7 +52,7 @@ internal fun FijosPage(
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item(key = "intro") {
-            PageIntro("Suscripciones y cuentas que se repiten cada mes o año.") { AddPill(onAdd) }
+            PageIntro("Cuentas, suscripciones y también tu sueldo: lo que se repite cada mes o año.") { AddPill(onAdd) }
             Spacer(Modifier.height(8.dp))
         }
         if (state.items.isEmpty() && state.isLoading) {
@@ -71,6 +71,7 @@ internal fun FijosPage(
             FijoRow(
                 row, today, i, state.items.size, Modifier.animateItem(),
                 registering = row.item.id in state.registering,
+                income = state.isIncome(row.item),
                 onEdit = { onEdit(row.item) },
                 onRegister = { if (row.status.state == PayState.PAGADO) confirmDuplicate = row.item else onRegister(row.item) },
             )
@@ -96,6 +97,7 @@ private fun FijoRow(
     count: Int,
     modifier: Modifier,
     registering: Boolean,
+    income: Boolean,
     onEdit: () -> Unit,
     onRegister: () -> Unit,
 ) {
@@ -116,7 +118,7 @@ private fun FijoRow(
             Text(row.status.label(today), style = MaterialTheme.typography.bodySmall, color = stateColor, maxLines = 1)
             Text(
                 buildString {
-                    append(money(item.amount)).append(" · ")
+                    append(if (income) "+" else "").append(money(item.amount)).append(" · ")
                     append(frequencyLabel(item.frequency))
                     item.billingDay?.let { append(" · día $it") }
                     item.categories?.name?.let { append(" · $it") }
@@ -127,7 +129,8 @@ private fun FijoRow(
         Spacer(Modifier.width(12.dp))
         PayButton(
             done = row.status.state == PayState.PAGADO, busy = registering, onClick = onRegister,
-            label = "Registrar pago de ${item.name}", doneText = "Pagado",
+            label = if (income) "Registrar que recibiste ${item.name}" else "Registrar pago de ${item.name}",
+            doneText = if (income) "Recibido" else "Pagado", actionText = if (income) "Recibir" else "Pagar",
         )
     }
 }

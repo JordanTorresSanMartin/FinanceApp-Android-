@@ -39,6 +39,9 @@ data class BudgetsUiState(
     val currentYear: Int = LocalDate.now().year,
     val currentMonth: Int = LocalDate.now().monthValue,
     val error: String? = null,
+    /** Presupuesto total del mes anterior (si este mes está vacío, se ofrece copiarlo). */
+    val previousTotal: Double = 0.0,
+    val copying: Boolean = false,
 ) {
     val totalAvailable: Double get() = totalBudget - totalSpent
 }
@@ -84,8 +87,14 @@ class BudgetsViewModel @Inject constructor(
                         CalculatedBudget(id, cat.name, cat.icon, cat.color, budgetAmount, spent, pct, budgetStatus(pct))
                     }
                 }
+                val total = items.sumOf { b -> b.budgetAmount }
+                val previousTotal = if (total > 0) 0.0 else runCatching {
+                    val (py, pm) = shiftYearMonth(year, month, -1)
+                    repository.getBudgetsForMonth(py, pm).sumOf { it.amount }
+                }.getOrDefault(0.0)
                 _uiState.update {
                     it.copy(
+                        previousTotal = previousTotal,
                         items = items,
                         totalBudget = items.sumOf { b -> b.budgetAmount },
                         totalSpent = items.sumOf { b -> b.spent },
@@ -110,6 +119,24 @@ class BudgetsViewModel @Inject constructor(
                 _uiState.update { it.copy(error = friendlyError(e, "No se pudo guardar el presupuesto")) }
             } finally {
                 _uiState.update { it.copy(savingId = null) }
+                load()
+            }
+        }
+    }
+
+    /** Copia los montos del mes anterior a este (para no configurarlo de nuevo cada mes). */
+    fun copyFromPrevious() {
+        val (year, month) = _uiState.value.run { currentYear to currentMonth }
+        viewModelScope.launch {
+            _uiState.update { it.copy(copying = true) }
+            try {
+                val (py, pm) = shiftYearMonth(year, month, -1)
+                repository.getBudgetsForMonth(py, pm).filter { it.amount > 0 }
+                    .forEach { repository.upsertBudget(it.categoryId, year, month, it.amount) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = friendlyError(e, "No se pudo copiar el presupuesto")) }
+            } finally {
+                _uiState.update { it.copy(copying = false) }
                 load()
             }
         }

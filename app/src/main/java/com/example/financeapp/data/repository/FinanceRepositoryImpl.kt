@@ -2,6 +2,7 @@ package com.example.financeapp.data.repository
 
 import com.example.financeapp.data.model.*
 import com.example.financeapp.domain.RECURRING_NOTE
+import com.example.financeapp.domain.INSTALLMENT_NOTE
 import com.example.financeapp.domain.repository.FinanceRepository
 import com.example.financeapp.util.toJavaLocalDate
 import com.example.financeapp.util.DataVersion
@@ -36,6 +37,7 @@ class FinanceRepositoryImpl @Inject constructor(
     private val postgrest: Postgrest,
     private val auth: Auth,
     private val functions: Functions,
+    private val tracking: com.example.financeapp.data.local.TrackingStore,
 ) : FinanceRepository {
 
     override fun currentUserId(): String? = auth.currentUserOrNull()?.id
@@ -58,9 +60,19 @@ class FinanceRepositoryImpl @Inject constructor(
                 val m = s.month ?: return@filter false
                 y < year || (y == year && m <= month)
             }.sortedWith(compareBy({ it.year ?: 0 }, { it.month ?: 0 }))
-            if (upTo.isEmpty()) return@withContext null
+            val target = java.time.YearMonth.of(year, month)
+            val start = tracking.start
+            // Con fecha de inicio, un mes sin movimientos igual muestra el saldo inicial.
+            if (upTo.isEmpty() && (start == null || target.isBefore(start))) return@withContext null
 
-            val cumulative = upTo.sumOf { it.balance ?: 0.0 }
+            val cumulative = com.example.financeapp.domain.cumulativeBalance(
+                upTo.associate { java.time.YearMonth.of(it.year!!, it.month!!) to (it.balance ?: 0.0) },
+                target, start, tracking.initialBalance,
+            )
+            if (upTo.isEmpty()) return@withContext MonthlySummary(
+                year = year, month = month, totalIncome = 0.0, totalExpenses = 0.0,
+                balance = 0.0, savingsPct = 0.0, cumulativeBalance = cumulative,
+            )
             val latest = upTo.last()
             if (latest.year == year && latest.month == month) {
                 latest.copy(cumulativeBalance = cumulative)
@@ -121,6 +133,60 @@ class FinanceRepositoryImpl @Inject constructor(
         postgrest["categories"].select {
             order("sort_order", Order.ASCENDING)
         }.decodeList<Category>()
+    }
+
+    override suspend fun saveCategory(id: String?, name: String, type: String, icon: String?, color: String?) {
+        DataVersion.bump()
+        withContext(Dispatchers.IO) {
+            val body = buildJsonObject {
+                put("name", name); put("type", type); put("icon", icon); put("color", color)
+            }
+            if (id != null) {
+                postgrest["categories"].update(body) { filter { eq("id", id) } }
+            } else {
+                // Las categorías del usuario llevan user_id; si la tabla no lo tiene, se inserta sin él.
+                runCatching {
+                    postgrest["categories"].insert(buildJsonObject { body.forEach { (k, v) -> put(k, v) }; put("user_id", requireUserId()) })
+                }.recoverCatching { postgrest["categories"].insert(body) }.getOrThrow()
+            }
+        }
+    }
+
+    override suspend fun registerInstallmentExpense(name: String, n: Int, total: Int, amount: Double, date: LocalDate) {
+        // Categoría: la que usaste antes para esa compra; si no, una de crédito/deuda/cuotas.
+        val cats = runCatching { getCategories() }.getOrDefault(emptyList()).filter { it.type != TxType.INGRESO }
+        val category = runCatching { com.example.financeapp.domain.suggestCategory(getCategoryHistory(), name) }.getOrNull()
+            ?.takeIf { id -> cats.any { it.id == id } }
+            ?: cats.firstOrNull { Regex("cuota|cr[eé]dito|deuda", RegexOption.IGNORE_CASE).containsMatchIn(it.name) }?.id
+        insertTransaction(date, "$name · cuota $n/$total", category, TxType.GASTO, amount, INSTALLMENT_NOTE)
+    }
+
+    override suspend fun undoInstallmentExpense(name: String) {
+        val tx = withContext(Dispatchers.IO) {
+            postgrest["transactions"].select {
+                filter { eq("notes", INSTALLMENT_NOTE); like("description", "$name · cuota %") }
+                order("date", Order.DESCENDING)
+                limit(1)
+            }.decodeList<Transaction>()
+        }.firstOrNull() ?: return
+        deleteTransaction(tx.id ?: return)
+    }
+
+    @kotlinx.serialization.Serializable
+    private data class DescCategory(
+        val description: String? = null,
+        @kotlinx.serialization.SerialName("category_id") val categoryId: String? = null,
+    )
+
+    override suspend fun getCategoryHistory(): Map<String, String> = withContext(Dispatchers.IO) {
+        postgrest["transactions"].select(Columns.list("description", "category_id")) {
+            order("date", Order.DESCENDING)
+            limit(600)
+        }.decodeList<DescCategory>()
+            .mapNotNull { r -> r.categoryId?.let { c -> r.description?.let { com.example.financeapp.domain.normalizeDescription(it) to c } } }
+            .filter { it.first.isNotEmpty() }
+            .distinctBy { it.first } // la primera es la más reciente
+            .toMap()
     }
 
     override suspend fun getTransactionsByMonth(year: Int, month: Int): List<Transaction> =
@@ -302,15 +368,24 @@ class FinanceRepositoryImpl @Inject constructor(
                 .groupBy({ it.description.trim().lowercase() }, { it.date.toJavaLocalDate() })
         }
 
+    /** Si la categoría del pago fijo es de ingreso (ej. Sueldo), se registra como ingreso. */
     override suspend fun registerRecurringPayment(item: RecurringPayment, date: LocalDate) =
         insertTransaction(
             date = date,
             description = item.name,
             categoryId = item.categoryId,
-            type = TxType.GASTO,
+            type = if (categoryType(item.categoryId) == TxType.INGRESO) TxType.INGRESO else TxType.GASTO,
             amount = item.amount,
             notes = RECURRING_NOTE,
         )
+
+    private suspend fun categoryType(id: String?): String? = id?.let {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                postgrest["categories"].select { filter { eq("id", it) } }.decodeList<Category>().firstOrNull()?.type
+            }.getOrNull()
+        }
+    }
 
     override suspend fun undoRecurringPayment(item: RecurringPayment, date: LocalDate) {
         val tx = withContext(Dispatchers.IO) {

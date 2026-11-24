@@ -30,7 +30,12 @@ data class RecurringUiState(
     val message: String? = null,
 ) {
     val paidCount: Int get() = items.count { it.status.state == PayState.PAGADO }
-    val pendingAmount: Double get() = items.filter { it.status.state != PayState.PAGADO }.sumOf { it.item.amount }
+    /** Ids de categorías de ingreso: un "pago fijo" con una de ellas es un ingreso (ej. Sueldo). */
+    private val incomeCategoryIds: Set<String>
+        get() = categories.filter { it.type == com.example.financeapp.data.model.TxType.INGRESO }.mapNotNull { it.id }.toSet()
+    fun isIncome(p: RecurringPayment): Boolean = p.categoryId != null && p.categoryId in incomeCategoryIds
+    /** Lo que falta PAGAR (los ingresos no cuentan aquí). */
+    val pendingAmount: Double get() = items.filter { it.status.state != PayState.PAGADO && !isIncome(it.item) }.sumOf { it.item.amount }
 }
 
 @HiltViewModel

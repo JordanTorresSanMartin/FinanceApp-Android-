@@ -154,7 +154,7 @@ internal fun ThinProgress(progress: Float, color: Color, modifier: Modifier = Mo
  * Tocar el chip sigue llamando [onClick] (la pantalla decide si confirma un pago extra).
  */
 @Composable
-internal fun PayButton(done: Boolean, onClick: () -> Unit, label: String, busy: Boolean = false, doneText: String = "Pagada") {
+internal fun PayButton(done: Boolean, onClick: () -> Unit, label: String, busy: Boolean = false, doneText: String = "Pagada", actionText: String = "Pagar") {
     val finance = FinanceTheme.colors
     AnimatedContent(
         targetState = done,
@@ -185,7 +185,7 @@ internal fun PayButton(done: Boolean, onClick: () -> Unit, label: String, busy: 
                 if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Pagar", fontWeight = FontWeight.SemiBold)
+                Text(actionText, fontWeight = FontWeight.SemiBold)
             }
         }
     }

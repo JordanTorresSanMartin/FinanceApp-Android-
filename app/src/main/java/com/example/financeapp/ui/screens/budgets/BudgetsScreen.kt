@@ -69,6 +69,7 @@ fun BudgetsScreen(
     viewModel: BudgetsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = com.example.financeapp.util.LocalAppHaptics.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.loadIfStale() }
     val finance = FinanceTheme.colors
 
@@ -126,6 +127,27 @@ fun BudgetsScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    // Mes vacío pero el anterior tenía presupuesto: copiarlo con un toque.
+                    if (state.totalBudget == 0.0 && state.previousTotal > 0) {
+                        item(key = "copy-previous") {
+                            Row(
+                                modifier = Modifier.animateItem().fillMaxWidth()
+                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer).padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Este mes no tiene presupuesto", style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                    Text("El mes anterior tenías ${formatMoneyCLP(state.previousTotal)}. ¿Usar los mismos montos?",
+                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                                androidx.compose.material3.FilledTonalButton(
+                                    onClick = { haptics?.success(); viewModel.copyFromPrevious() }, enabled = !state.copying,
+                                ) { Text(if (state.copying) "Copiando…" else "Copiar") }
+                            }
+                        }
+                    }
                     state.error?.let { err ->
                         item {
                             Text(

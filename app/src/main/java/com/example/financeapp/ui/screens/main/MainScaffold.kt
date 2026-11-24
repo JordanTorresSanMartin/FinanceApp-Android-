@@ -1,5 +1,9 @@
 package com.example.financeapp.ui.screens.main
 
+import androidx.compose.material.icons.filled.CalendarMonth
+import com.example.financeapp.ui.screens.analysis.AnalysisHub
+import com.example.financeapp.ui.screens.upcoming.UpcomingScreen
+
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -57,9 +61,9 @@ fun MainScaffold(
 
     val items = listOf(
         BottomNavItem("Inicio", Icons.Filled.Dashboard, NavRoute.Dashboard),
-        BottomNavItem("Historial", Icons.AutoMirrored.Filled.ListAlt, NavRoute.Transactions),
-        BottomNavItem("Presupuesto", Icons.Filled.PieChart, NavRoute.Budgets),
-        BottomNavItem("Resumen", Icons.Filled.BarChart, NavRoute.AnnualSummary),
+        BottomNavItem("Movimientos", Icons.AutoMirrored.Filled.ListAlt, NavRoute.Transactions),
+        BottomNavItem("Pagos", Icons.Filled.CalendarMonth, NavRoute.Payments),
+        BottomNavItem("Análisis", Icons.Filled.PieChart, NavRoute.AnalysisHub),
         BottomNavItem("Perfil", Icons.Filled.AccountCircle, NavRoute.Profile),
     )
 
@@ -81,14 +85,7 @@ fun MainScaffold(
                             )
                         },
                         selected = selected,
-                        onClick = {
-                            haptics?.selection()
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { haptics?.selection(); navController.navigateToTab(item.route) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -114,8 +111,9 @@ fun MainScaffold(
             composable<NavRoute.Dashboard> {
                 DashboardScreen(
                     onNavigateToNewTransaction = onNavigateToNewTransaction,
-                    onNavigateToAnalytics = onNavigateToAnalytics,
-                    onNavigateToUpcoming = onNavigateToUpcoming,
+                    // Ahora son pestañas: se cambia de pestaña en vez de abrir una pantalla encima.
+                    onNavigateToAnalytics = { navController.navigateToTab(NavRoute.AnalysisHub) },
+                    onNavigateToUpcoming = { navController.navigateToTab(NavRoute.Payments) },
                 )
             }
             composable<NavRoute.Transactions> {
@@ -124,9 +122,16 @@ fun MainScaffold(
                     onNavigateToEditTransaction = onNavigateToEditTransaction,
                 )
             }
-            composable<NavRoute.Budgets> { BudgetsScreen() }
-            composable<NavRoute.AnnualSummary> { AnnualSummaryScreen() }
+            composable<NavRoute.Payments> { UpcomingScreen(onBack = {}, showBack = false) }
+            composable<NavRoute.AnalysisHub> { AnalysisHub() }
             composable<NavRoute.Profile> { ProfileScreen() }
         }
     }
+}
+
+/** Cambiar de pestaña conservando el estado de cada una (scroll, mes elegido…). */
+private fun androidx.navigation.NavController.navigateToTab(route: NavRoute) = navigate(route) {
+    popUpTo(graph.findStartDestination().id) { saveState = true }
+    launchSingleTop = true
+    restoreState = true
 }

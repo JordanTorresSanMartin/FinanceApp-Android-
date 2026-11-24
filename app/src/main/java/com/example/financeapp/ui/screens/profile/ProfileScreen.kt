@@ -1,5 +1,10 @@
 package com.example.financeapp.ui.screens.profile
 
+import com.example.financeapp.ui.components.pressable
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +57,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     val haptics = com.example.financeapp.util.LocalAppHaptics.current
     var confirmLogout by remember { mutableStateOf(false) }
+    var categoriesOpen by remember { mutableStateOf(false) }
     val lockAvailable = remember { LockPrefs.isAvailable(context) }
     var lockEnabled by remember { mutableStateOf(LockPrefs.isEnabled(context)) }
 
@@ -79,6 +85,26 @@ fun ProfileScreen(
                 Spacer(Modifier.height(16.dp))
                 Text(state.name, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
                 Text(state.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+            }
+
+            TrackingCard(viewModel.trackingStart, viewModel.initialBalance, viewModel::saveTracking)
+
+            // Categorías: crear / editar (ej. dividir "Deudas/Créditos")
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .pressable(onClick = { viewModel.loadCategories(); categoriesOpen = true }, strongHaptic = true)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Category, null, tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                    Text("Categorías", style = MaterialTheme.typography.titleMedium)
+                    Text("Crea o edita tus categorías de gastos e ingresos.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             // Bloqueo con huella / PIN
@@ -124,6 +150,15 @@ fun ProfileScreen(
                 Text("Cerrar sesión", fontWeight = FontWeight.Bold)
             }
         }
+    }
+
+    if (categoriesOpen) {
+        val categories by viewModel.categories.collectAsStateWithLifecycle()
+        CategoriesSheet(categories, onDismiss = { categoriesOpen = false }, onSave = viewModel::saveCategory)
+    }
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    LaunchedEffect(message) {
+        message?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show(); viewModel.consumeMessage() }
     }
 
     if (confirmLogout) {

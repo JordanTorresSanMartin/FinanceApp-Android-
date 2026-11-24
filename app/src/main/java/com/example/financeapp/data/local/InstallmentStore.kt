@@ -34,6 +34,7 @@ import javax.inject.Singleton
 class InstallmentStore @Inject constructor(
     @ApplicationContext private val context: Context,
     private val postgrest: Postgrest,
+    private val repository: com.example.financeapp.domain.repository.FinanceRepository,
 ) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
@@ -67,8 +68,15 @@ class InstallmentStore @Inject constructor(
 
     /** Marca la siguiente cuota como pagada. No hace nada si ya estaba completa. */
     suspend fun pay(id: String, date: LocalDate = LocalDate.now()) = write {
-        if (_plans.value.find { it.id == id }?.isDone != false) return@write
+        val plan = _plans.value.find { it.id == id }
+        if (plan == null || plan.isDone) return@write
         insertPayment(id, date.toString())
+        // Cuota propia = gasto real (igual que un pago fijo). Si alguien te la debe, el que paga es él.
+        if (plan.owedBy == null) runCatching {
+            repository.registerInstallmentExpense(
+                plan.name, plan.paid + 1, plan.total, plan.amount.toDouble(), kotlinx.datetime.LocalDate.parse(date.toString()),
+            )
+        }
     }
 
     /** Deshace el último pago registrado (desde la app, el widget o la planilla). */
@@ -79,6 +87,8 @@ class InstallmentStore @Inject constructor(
             limit(1)
         }.decodeList<PaymentRow>().firstOrNull() ?: return@write
         postgrest[PAYMENTS].delete { filter { eq("id", last.id) } }
+        val plan = _plans.value.find { it.id == id }
+        if (plan != null && plan.owedBy == null) runCatching { repository.undoInstallmentExpense(plan.name) }
     }
 
     /** Ejecuta el cambio en el servidor y vuelve a leer, todo bajo el mismo candado. */

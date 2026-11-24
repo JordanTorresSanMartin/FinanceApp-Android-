@@ -110,7 +110,8 @@ fun RecurringEditorSheet(
     var categoryId by rememberSaveable { mutableStateOf(editing?.categoryId) }
     var notes by rememberSaveable { mutableStateOf(editing?.notes ?: "") }
     var confirmDelete by remember { mutableStateOf(false) }
-    val expenseCats = categories.filter { it.type == TxType.GASTO || it.type == "ambos" }
+    // Gastos primero; las de ingreso (Sueldo…) al final: un "pago fijo" de ingreso se registra como ingreso.
+    val expenseCats = categories.sortedBy { if (it.type == TxType.INGRESO) 1 else 0 }
     val amountValue = amount.toLongOrNull() ?: 0L
     val dayValue = billingDay.toIntOrNull()
     val dayError = billingDay.isNotEmpty() && (dayValue == null || dayValue !in 1..31)
