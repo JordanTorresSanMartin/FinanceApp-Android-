@@ -358,7 +358,8 @@ private fun TarjetasPage(
     var confirmClose by remember { mutableStateOf<com.example.financeapp.data.model.Statement?>(null) }
     val perCard = remember(state.installments) { state.installments.groupBy { it.statementId } }
     val dueJava = state.nextDue?.let { runCatching { java.time.LocalDate.parse(it.toString()) }.getOrNull() }
-    val stale = dueJava != null && dueJava.isBefore(today.minusDays(7))
+    // Ciclo mensual: recién 30 días después del vencimiento debería existir un estado de cuenta nuevo.
+    val stale = dueJava != null && dueJava.isBefore(today.minusDays(30))
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item(key = "intro") {
