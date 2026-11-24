@@ -231,9 +231,8 @@ class FinanceRepositoryImpl @Inject constructor(
                 body = payload,
                 headers = Headers.build {
                     append(HttpHeaders.ContentType, "application/json")
-                    // Adjuntamos el JWT del usuario explícitamente: la Edge Function exige
-                    // `Authorization: Bearer <jwt>` y hace getUser(jwt).
-                    append(HttpHeaders.Authorization, "Bearer $token")
+                    // NO agregar Authorization: supabase-kt ya envía "Bearer <jwt de la sesión>".
+                    // Duplicarlo llegaba al servidor como "Bearer X, Bearer X" → 401 "No autorizado".
                 },
             ).bodyAsText()
         } catch (e: RestException) {
