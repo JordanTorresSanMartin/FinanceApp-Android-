@@ -7,6 +7,8 @@ import com.example.financeapp.util.toJavaLocalDate
 import com.example.financeapp.util.DataVersion
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.functions.Functions
+import io.github.jan.supabase.exceptions.RestException
+import android.util.Log
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
@@ -221,17 +223,30 @@ class FinanceRepositoryImpl @Inject constructor(
             put("filename", filename)
             if (password != null) put("password", password)
         }
-        val response = functions.invoke(
-            function = "parse-statement",
-            body = payload,
-            headers = Headers.build {
-                append(HttpHeaders.ContentType, "application/json")
-                // Adjuntamos el JWT del usuario explícitamente: la Edge Function exige
-                // `Authorization: Bearer <jwt>` y hace getUser(jwt).
-                append(HttpHeaders.Authorization, "Bearer $token")
-            },
-        )
-        val obj: JsonObject = tolerantJson.parseToJsonElement(response.bodyAsText()).jsonObject
+        // Si la función responde 4xx/5xx, supabase-kt lanza RestException y el mensaje real del
+        // servidor ({ok, code, error}) se perdía: el usuario solo veía "No se pudo…". Lo leemos igual.
+        val body = try {
+            functions.invoke(
+                function = "parse-statement",
+                body = payload,
+                headers = Headers.build {
+                    append(HttpHeaders.ContentType, "application/json")
+                    // Adjuntamos el JWT del usuario explícitamente: la Edge Function exige
+                    // `Authorization: Bearer <jwt>` y hace getUser(jwt).
+                    append(HttpHeaders.Authorization, "Bearer $token")
+                },
+            ).bodyAsText()
+        } catch (e: RestException) {
+            Log.w("parse-statement", "HTTP ${e.statusCode}: ${e.error} ${e.description.orEmpty()}")
+            runCatching { e.response.bodyAsText() }.getOrNull()
+                ?.takeIf { it.trimStart().startsWith("{") }
+                ?: return@withContext StatementParseResult(
+                    ok = false, error = "El servidor no pudo leer el PDF (${e.statusCode}): ${e.description ?: e.error}",
+                )
+        }
+        val obj: JsonObject = runCatching { tolerantJson.parseToJsonElement(body).jsonObject }.getOrElse {
+            return@withContext StatementParseResult(ok = false, error = "Respuesta inesperada del servidor al leer el PDF.")
+        }
         StatementParseResult(
             ok = obj["ok"]?.jsonPrimitive?.booleanOrNull ?: false,
             code = obj["code"]?.jsonPrimitive?.contentOrNull,
