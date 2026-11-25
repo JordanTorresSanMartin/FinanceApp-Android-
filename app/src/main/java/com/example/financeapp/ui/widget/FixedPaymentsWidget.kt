@@ -36,6 +36,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -119,7 +120,19 @@ class FixedPaymentsWidgetStore @Inject constructor(
     suspend fun refresh() {
         if (demo()) return
         runCatching { auth.awaitInitialization() }
-        if (auth.currentSessionOrNull() == null) return save(FixedSnapshot(signedIn = false, loaded = true))
+        when (auth.sessionStatus.value) {
+            // Solo esto es "no hay sesión" (nunca entró o cerró sesión).
+            is SessionStatus.NotAuthenticated -> return save(FixedSnapshot(signedIn = false, loaded = true))
+            // El token venció y no se pudo renovar (en segundo plano Android suele cortar la red): la
+            // sesión sigue guardada. Antes esto mostraba "Inicia sesión" aunque la app estuviera logueada.
+            is SessionStatus.RefreshFailure -> {
+                runCatching { auth.refreshCurrentSession() }
+                if (auth.sessionStatus.value !is SessionStatus.Authenticated) {
+                    return save(_state.value.copy(signedIn = true, loaded = true, offline = true))
+                }
+            }
+            else -> Unit
+        }
         val today = LocalDate.now()
         val items = withTimeoutOrNull(15_000) { runCatching { recurringStatus(today) }.getOrNull() }
             ?: return save(_state.value.copy(loaded = true, offline = true))

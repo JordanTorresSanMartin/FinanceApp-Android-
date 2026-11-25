@@ -135,6 +135,7 @@ object DueAlerts {
 interface DueEntryPoint {
     fun recurringStatus(): GetRecurringStatusUseCase
     fun installments(): InstallmentStore
+    fun fixedWidget(): com.example.financeapp.ui.widget.FixedPaymentsWidgetStore
 }
 
 class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -143,6 +144,8 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         // Sin sesión o sin red: se reintenta en la próxima revisión (no insiste en bucle).
         val recurring = runCatching { ep.recurringStatus()() }.getOrElse { return Result.success() }
         runCatching { ep.installments().refresh() }
+        // Corre con red garantizada: también recupera el widget "Pagos fijos" si quedó sin conexión.
+        runCatching { ep.fixedWidget().refresh() }
         DueAlerts.show(applicationContext, dueItems(recurring, ep.installments().plans.value, LocalDate.now()))
         return Result.success()
     }
