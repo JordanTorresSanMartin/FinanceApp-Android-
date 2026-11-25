@@ -161,7 +161,10 @@ fun UpcomingScreen(
         ) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
     // Tras pagar (o al cargar) se recalcula el aviso; WorkManager funde llamadas seguidas.
-    LaunchedEffect(plans, recurring.items) { if (!recurring.isLoading) DueAlerts.checkNow(context) }
+    // Con los datos ya cargados el aviso se calcula aquí mismo: sin red ni trabajo en segundo plano.
+    LaunchedEffect(plans, recurring.items) {
+        if (!recurring.isLoading) DueAlerts.show(context, com.example.financeapp.notifications.dueItems(recurring.items, plans, java.time.LocalDate.now()))
+    }
 
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); viewModel.consumeMessage() } }
     LaunchedEffect(recurring.message) { recurring.message?.let { snackbar.showSnackbar(it); recurringVm.consumeMessage() } }

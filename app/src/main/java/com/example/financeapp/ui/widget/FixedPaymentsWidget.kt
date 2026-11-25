@@ -136,6 +136,12 @@ class FixedPaymentsWidgetStore @Inject constructor(
         val today = LocalDate.now()
         val items = withTimeoutOrNull(15_000) { runCatching { recurringStatus(today) }.getOrNull() }
             ?: return save(_state.value.copy(loaded = true, offline = true))
+        publish(items)
+    }
+
+    /** Pinta el widget con pagos ya consultados (la revisión de fondo los comparte: una sola consulta). */
+    suspend fun publish(items: List<com.example.financeapp.domain.RecurringWithStatus>) {
+        if (demo()) return
         save(FixedSnapshot(loaded = true, rows = items.mapNotNull { r ->
             FixedRow(
                 id = r.item.id ?: return@mapNotNull null,

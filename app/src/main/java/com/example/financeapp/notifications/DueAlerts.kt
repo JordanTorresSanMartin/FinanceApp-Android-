@@ -80,8 +80,12 @@ object DueAlerts {
 
     /** Revisa ahora (tras pagar o cambiar algo). Llamadas seguidas se funden en una. */
     fun checkNow(context: Context) {
-        WorkManager.getInstance(context)
-            .enqueueUniqueWork("due-now", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DueWorker>().build())
+        // Espera 10 s: varios toques seguidos (pagar, deshacer…) se funden en UNA revisión con red.
+        val req = OneTimeWorkRequestBuilder<DueWorker>()
+            .setInitialDelay(10, TimeUnit.SECONDS)
+            .setConstraints(Constraints(requiredNetworkType = NetworkType.CONNECTED))
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork("due-now", ExistingWorkPolicy.REPLACE, req)
     }
 
     fun show(context: Context, items: List<DueItem>) {
@@ -141,12 +145,15 @@ interface DueEntryPoint {
 class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val ep = EntryPointAccessors.fromApplication(applicationContext, DueEntryPoint::class.java)
+        // Tope de 25 s: con mala red no se queda despierto esperando (antes promediaba 52 s).
         // Sin sesión o sin red: se reintenta en la próxima revisión (no insiste en bucle).
-        val recurring = runCatching { ep.recurringStatus()() }.getOrElse { return Result.success() }
-        runCatching { ep.installments().refresh() }
-        // Corre con red garantizada: también recupera el widget "Pagos fijos" si quedó sin conexión.
-        runCatching { ep.fixedWidget().refresh() }
-        DueAlerts.show(applicationContext, dueItems(recurring, ep.installments().plans.value, LocalDate.now()))
+        kotlinx.coroutines.withTimeoutOrNull(25_000) {
+            val recurring = runCatching { ep.recurringStatus()() }.getOrNull() ?: return@withTimeoutOrNull
+            // Una sola consulta de pagos fijos para el aviso Y el widget (antes se pedía dos veces).
+            runCatching { ep.fixedWidget().publish(recurring) }
+            runCatching { ep.installments().refresh() }
+            DueAlerts.show(applicationContext, dueItems(recurring, ep.installments().plans.value, LocalDate.now()))
+        }
         return Result.success()
     }
 }
